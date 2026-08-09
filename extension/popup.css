@@ -1,0 +1,173 @@
+:root {
+  --bg-color: #0f172a;
+  --card-bg: #1e293b;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --border-color: #334155;
+  --accent-cyan: #06b6d4;
+  --safe-color: #10b981;
+  --warn-color: #f59e0b;
+  --danger-color: #ef4444;
+  --unknown-color: #64748b;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 320px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+}
+
+.popup-container {
+  padding: 16px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand h1 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.shield-icon {
+  font-size: 18px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #ef4444;
+}
+
+.status-dot.online {
+  background-color: var(--safe-color);
+  box-shadow: 0 0 8px var(--safe-color);
+}
+
+.domain-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.domain-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.domain-value {
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 4px;
+  word-break: break-all;
+  color: var(--accent-cyan);
+}
+
+.status-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.status-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.badge.safe {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--safe-color);
+  border: 1px solid var(--safe-color);
+}
+
+.badge.suspicious {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: var(--warn-color);
+  border: 1px solid var(--warn-color);
+}
+
+.badge.high_confidence_threat {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--danger-color);
+  border: 1px solid var(--danger-color);
+}
+
+.badge.unknown {
+  background-color: rgba(100, 116, 139, 0.15);
+  color: var(--unknown-color);
+  border: 1px solid var(--unknown-color);
+}
+
+.status-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.notice-box {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 14px;
+  font-size: 11px;
+  color: #fbbf24;
+  line-height: 1.3;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 9px;
+  background: linear-gradient(135deg, #0284c7, #06b6d4);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 13px;
+  transition: opacity 0.2s;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}

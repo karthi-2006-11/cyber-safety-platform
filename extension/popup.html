@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cyber Safety Protection</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <header class="header">
+      <div class="brand">
+        <span class="shield-icon">🛡️</span>
+        <h1>Cyber Safety</h1>
+      </div>
+      <span id="backend-status-dot" class="status-dot offline" title="Backend Status"></span>
+    </header>
+
+    <div class="domain-card">
+      <div class="domain-label">Current Website</div>
+      <div id="domain-name" class="domain-value">Loading...</div>
+    </div>
+
+    <div class="status-card">
+      <div class="status-header">Safety Classification</div>
+      <div id="status-badge" class="badge unknown">UNKNOWN</div>
+      <p id="status-description" class="status-desc">
+        Checking domain against threat API...
+      </p>
+    </div>
+
+    <div class="notice-box">
+      <small>⚠️ Real-time automated threat engine & third-party evidence feeds are currently in development phase.</small>
+    </div>
+
+    <footer class="footer">
+      <button id="open-dashboard-btn" class="btn-primary">Open User Dashboard</button>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
