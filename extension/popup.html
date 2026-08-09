@@ -13,7 +13,10 @@
         <span class="shield-icon">🛡️</span>
         <h1>Cyber Safety</h1>
       </div>
-      <span id="backend-status-dot" class="status-dot offline" title="Backend Status"></span>
+      <div class="status-indicator">
+        <span id="backend-status-dot" class="status-dot offline"></span>
+        <span id="protection-status-label" style="font-size: 11px; color: var(--text-muted);">Checking...</span>
+      </div>
     </header>
 
     <div class="domain-card">
@@ -25,12 +28,13 @@
       <div class="status-header">Safety Classification</div>
       <div id="status-badge" class="badge unknown">UNKNOWN</div>
       <p id="status-description" class="status-desc">
-        Checking domain against threat API...
+        Inspecting domain against threat pipeline...
       </p>
     </div>
 
-    <div class="notice-box">
-      <small>⚠️ Real-time automated threat engine & third-party evidence feeds are currently in development phase.</small>
+    <div class="rules-summary-box">
+      <span style="font-size: 14px;">🔒</span>
+      <span id="blocked-rules-count">0 Active Block Rules</span>
     </div>
 
     <footer class="footer">

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Website Blocked — Cyber Safety Protection</title>
+  <link rel="stylesheet" href="blocked.css">
+</head>
+<body>
+  <div class="block-card">
+    <div class="block-header">
+      <div class="block-icon">🚫</div>
+      <div class="block-title">WEBSITE BLOCKED</div>
+      <p class="block-subtitle">
+        This website was blocked because our protection system identified it as a high-confidence cyber threat.
+      </p>
+    </div>
+
+    <div class="target-box">
+      <div class="target-label">Target Domain</div>
+      <div id="target-domain" class="target-domain">Loading...</div>
+    </div>
+
+    <div class="meta-row">
+      <div class="meta-item">
+        <small>Classification</small>
+        <div id="classification-badge" class="badge high_confidence_threat">HIGH CONFIDENCE THREAT</div>
+      </div>
+      <div class="meta-item">
+        <small>Risk Level</small>
+        <div id="risk-level" class="meta-value">HIGH</div>
+      </div>
+      <div class="meta-item">
+        <small>Confidence Score</small>
+        <div id="confidence-score" class="meta-value">90%</div>
+      </div>
+    </div>
+
+    <div class="reasons-section">
+      <div class="section-title">Detection Reasons</div>
+      <ul id="reasons-list" class="reasons-list">
+        <li>Analyzing security signals...</li>
+      </ul>
+    </div>
+
+    <div class="evidence-section">
+      <div class="section-title">Why was this website blocked? (Supporting Evidence)</div>
+      <div id="evidence-container" class="evidence-container">
+        <div class="empty-notice">Loading evidence data...</div>
+      </div>
+    </div>
+
+    <div class="footer-actions">
+      <button id="close-tab-btn" class="btn btn-secondary">Close This Tab</button>
+      <button id="dashboard-btn" class="btn btn-primary">Open Safety Dashboard</button>
+    </div>
+  </div>
+
+  <script src="blocked.js"></script>
+</body>
+</html>

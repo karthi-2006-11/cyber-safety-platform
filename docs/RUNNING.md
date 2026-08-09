@@ -1,82 +1,76 @@
-# Running the Cyber Safety Platform
+# Cyber Safety Platform — Running & Testing Guide
 
-This guide outlines setup requirements and execution commands for launching all three major components of the platform.
-
----
-
-## Environment & Prerequisites
+## Prerequisites
 
 - **Node.js**: v18.0.0 or higher
-- **npm**: v9.0.0 or higher
-- **MongoDB** (Optional): Local instance running at `mongodb://127.0.0.1:27017` or remote MongoDB URI in `server/.env`. If MongoDB is not running, the server runs gracefully in fallback mode.
-- **Google Web Risk API Key** (Optional): Set `GOOGLE_WEB_RISK_API_KEY=your_key` in `server/.env` for real-time Google threat lookup. If missing, external checks are safely skipped with fallback to local/community signals.
+- **MongoDB**: Local MongoDB instance running on `mongodb://127.0.0.1:27017`
 
 ---
 
-## 1. Backend Server (`server/`)
+## 1. Running Backend Server
 
-### Setup & Launch
 ```bash
-# Navigate to server directory
 cd server
-
-# Environment variables setup
-cp .env.example .env
-
-# Install dependencies
 npm install
-
-# Run automated tests
-npm test
-
-# Start backend in development mode (port 5000)
-npm run dev
+npm start
 ```
-
-### Verification Endpoints
-```bash
-# Health Check
-curl http://localhost:5000/api/v1/health
-
-# Threat Pipeline Inspection
-curl "http://localhost:5000/api/v1/threats/check?domain=example.com"
-```
+- Server starts on `http://localhost:5000`.
+- Health Check available at: `http://localhost:5000/api/v1/health`
+- Threat Check available at: `http://localhost:5000/api/v1/threats/check?domain=example.com`
+- Pre-sync High Confidence endpoint: `http://localhost:5000/api/v1/threats/high-confidence`
 
 ---
 
-## 2. User Dashboard Client (`client/`)
+## 2. Running User Dashboard Client
 
-### Setup & Launch
 ```bash
-# Navigate to client directory
 cd client
-
-# Install dependencies
 npm install
-
-# Start client in development mode (port 3000)
 npm run dev
 ```
-
-Open your browser at `http://localhost:3000`.
-
----
-
-## 3. Browser Protection Extension (`extension/`)
-
-### Loading Extension into Chromium Browser
-
-1. Open Chrome/Chromium and navigate to `chrome://extensions/`.
-2. Enable **Developer mode** toggle in the top-right corner.
-3. Click **Load unpacked**.
-4. Select the `extension/` directory from this project monorepo.
-5. Click the Cyber Safety extension icon in your browser toolbar to view the popup interface.
+- Dashboard opens at `http://localhost:3000`.
 
 ---
 
-## Root Monorepo Commands
+## 3. Running Automated Test Suite
 
-From the root directory:
-- `npm run dev:server`: Starts Express backend server
-- `npm run dev:client`: Starts React dashboard client
-- `npm run build:client`: Compiles production assets for client UI
+```bash
+cd server
+npm test
+```
+Executes all 55 automated unit & integration tests across 6 test files:
+- `tests/pipeline.test.js`
+- `tests/webRisk.test.js`
+- `tests/wikipedia.test.js`
+- `tests/reddit.test.js`
+- `tests/combinedEvidence.test.js`
+- `tests/extensionIntegration.test.js`
+
+---
+
+## 4. Loading & Testing Browser Extension (Manifest V3)
+
+1. Open Google Chrome or Chromium browser.
+2. Navigate to `chrome://extensions/`.
+3. Enable **Developer mode** toggle in top-right corner.
+4. Click **Load unpacked** button.
+5. Select the `extension/` folder in this workspace repository.
+
+### Safe Manual Verification Procedure
+
+Do NOT use real malicious websites as test targets.
+
+#### Test A: High Confidence Threat Blocking
+1. Seed database with controlled fixture domain: `test-malicious-fixture.com` (status `HIGH_CONFIDENCE_THREAT`).
+2. Navigate to `http://test-malicious-fixture.com`.
+3. Extension receives decision, installs dynamic DNR rule, and redirects tab to `chrome-extension://<id>/blocked.html?domain=test-malicious-fixture.com`.
+4. Block page displays: 🚫 WEBSITE BLOCKED, classification, reasons, and evidence.
+
+#### Test B: Suspicious Domain Warning
+1. Seed database with controlled fixture domain: `test-suspicious-fixture.com` (status `SUSPICIOUS`).
+2. Navigate to `http://test-suspicious-fixture.com`.
+3. Extension receives decision, updates badge to `WARN`, and renders warning banner overlay at top of screen (`⚠️ POTENTIALLY DANGEROUS WEBSITE`).
+
+#### Test C: Safe / Unknown Domain Access
+1. Navigate to `http://example.com` or `http://test-safe-fixture.com`.
+2. Extension allows normal browsing without blocking.

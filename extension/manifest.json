@@ -2,11 +2,13 @@
   "manifest_version": 3,
   "name": "Cyber Safety Protection Engine",
   "version": "1.0.0",
-  "description": "Real-time domain safety warning and protection system.",
+  "description": "Real-time background threat evaluation and automatic website blocking system.",
   "permissions": [
     "activeTab",
     "tabs",
-    "storage"
+    "storage",
+    "webNavigation",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
     "http://localhost/*",
@@ -25,6 +27,12 @@
       "matches": ["http://*/*", "https://*/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["blocked.html", "blocked.css", "blocked.js"],
+      "matches": ["<all_urls>"]
     }
   ]
 }
