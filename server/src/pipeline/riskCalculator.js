@@ -11,11 +11,16 @@ const {
  * Pipeline Stage 6: Risk Calculator & Unified Evidence Assembler
  * Aggregates signals and constructs unified explainable decision object.
  * 
- * Rules:
- * - Wikipedia and Reddit serve as SUPPORTING EVIDENCE / CONTEXT.
- * - Wikipedia / Reddit entries do NOT automatically trigger HIGH_CONFIDENCE_THREAT.
- * - Single unverified PENDING report does NOT automatically trigger HIGH_CONFIDENCE_THREAT.
- * - REJECTED reports contribute 0 weight.
+ * Strict Phase 6 Threat Promotion Rules:
+ * 1. Single pending report -> SUSPICIOUS / UNKNOWN, NEVER HIGH_CONFIDENCE_THREAT.
+ * 2. Multiple pending reports -> SUSPICIOUS (MEDIUM risk), NEVER HIGH_CONFIDENCE_THREAT.
+ * 3. Wikipedia / Reddit context -> SUPPORTING EVIDENCE, NEVER forces HIGH_CONFIDENCE_THREAT.
+ * 4. REJECTED reports -> 0 weight.
+ * 5. HIGH_CONFIDENCE_THREAT requires:
+ *    - DB Record specifying HIGH_CONFIDENCE_THREAT
+ *    - Google Web Risk Threat Match (MALWARE / SOCIAL_ENGINEERING / UNWANTED_SOFTWARE)
+ *    - Actioned Community Report (actionedReportCount > 0)
+ *    - OR Verified Reports + Strong Verified Evidence (score >= 80 & verifiedReportCount >= 2)
  */
 function calculateRisk(
   domain,
@@ -33,14 +38,14 @@ function calculateRisk(
 
   const reasons = [];
   let totalScore = 0;
-  let hasCriticalThreatSignal = false;
+  let hasCriticalSecurityIntelMatch = false;
 
   for (const signal of allSignals) {
     if (signal.weight > 0) {
       totalScore += signal.weight;
       reasons.push(signal.description);
-      if (signal.severity === SIGNAL_SEVERITY.CRITICAL || signal.severity === SIGNAL_SEVERITY.HIGH) {
-        hasCriticalThreatSignal = true;
+      if (signal.severity === SIGNAL_SEVERITY.CRITICAL) {
+        hasCriticalSecurityIntelMatch = true;
       }
     } else if (signal.severity === SIGNAL_SEVERITY.INFO && signal.description) {
       reasons.push(signal.description);
@@ -69,16 +74,7 @@ function calculateRisk(
   // 2. User Community Evidence
   if (Array.isArray(communityData.evidence)) {
     for (const ev of communityData.evidence) {
-      unifiedEvidence.push({
-        source: EVIDENCE_SOURCES.COMMUNITY_REPORT,
-        sourceType: EVIDENCE_SOURCE_TYPES.USER_REPORT,
-        title: `Community Evidence (${ev.type || 'USER_SUBMISSION'})`,
-        url: ev.content && ev.content.startsWith('http') ? ev.content : null,
-        excerpt: ev.content,
-        relevance: 'HIGH',
-        verificationStatus: ev.isVerified ? VERIFICATION_STATUS.VERIFIED : VERIFICATION_STATUS.PENDING,
-        retrievedAt: new Date().toISOString()
-      });
+      unifiedEvidence.push(ev);
     }
   }
 
@@ -98,9 +94,9 @@ function calculateRisk(
 
   let classification = THREAT_LEVELS.UNKNOWN;
   let riskLevel = RISK_LEVELS.NONE;
-  let confidence = 0.50; // Baseline confidence
+  let confidence = 0.50;
 
-  // Official Website DB record override if present
+  // 1. Check Official Website DB record override
   if (reputationData.found && reputationData.websiteRecord) {
     const dbStatus = reputationData.websiteRecord.currentStatus;
     if (dbStatus === THREAT_LEVELS.HIGH_CONFIDENCE_THREAT) {
@@ -117,16 +113,20 @@ function calculateRisk(
       confidence = 0.85;
     }
   } else {
-    // Decision matrix based on aggregated threat intel & community signals
-    if (totalScore >= 75 || hasCriticalThreatSignal) {
+    // 2. Evaluate Promotion Criteria for HIGH_CONFIDENCE_THREAT
+    const isWebRiskMatch = webRiskData.checked && webRiskData.matchFound;
+    const isActionedCommunityReport = communityData.actionedReportCount > 0;
+    const isVerifiedCommunityPromotion = communityData.verifiedReportCount >= 2 && totalScore >= 80;
+
+    if (hasCriticalSecurityIntelMatch || isWebRiskMatch || isActionedCommunityReport || isVerifiedCommunityPromotion) {
       classification = THREAT_LEVELS.HIGH_CONFIDENCE_THREAT;
       riskLevel = RISK_LEVELS.HIGH;
       confidence = 0.90;
-    } else if (totalScore >= 35) {
+    } else if (totalScore >= 35 || (communityData.pendingReportsCount > 0 && communityData.independentReporterCount >= 2)) {
       classification = THREAT_LEVELS.SUSPICIOUS;
       riskLevel = RISK_LEVELS.MEDIUM;
       confidence = 0.75;
-    } else if (totalScore >= 15) {
+    } else if (totalScore >= 15 || communityData.reportsCount > 0) {
       classification = THREAT_LEVELS.SUSPICIOUS;
       riskLevel = RISK_LEVELS.LOW;
       confidence = 0.60;

@@ -2,8 +2,7 @@ const mongoose = require('mongoose');
 const { REPORT_STATUS } = require('../../../shared/constants');
 
 /**
- * UserReport Entity Schema (Minimum Foundation)
- * Allows users to submit safety reports for suspicious domains.
+ * UserReport Entity Schema — Phase 6 Community Intelligence
  */
 const userReportSchema = new mongoose.Schema({
   websiteId: {
@@ -16,12 +15,19 @@ const userReportSchema = new mongoose.Schema({
     type: String,
     required: true,
     lowercase: true,
-    trim: true
+    trim: true,
+    index: true
   },
   reportedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     default: null
+  },
+  reporterHash: {
+    type: String,
+    required: true,
+    trim: true,
+    index: true
   },
   category: {
     type: String,
@@ -36,7 +42,17 @@ const userReportSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: Object.values(REPORT_STATUS),
-    default: REPORT_STATUS.PENDING
+    default: REPORT_STATUS.PENDING,
+    index: true
+  },
+  confidenceContribution: {
+    type: Number,
+    default: 0.1
+  },
+  moderationMetadata: {
+    moderatedBy: { type: String, default: null },
+    moderatedAt: { type: Date, default: null },
+    moderationNotes: { type: String, default: null }
   }
 }, { timestamps: true });
 

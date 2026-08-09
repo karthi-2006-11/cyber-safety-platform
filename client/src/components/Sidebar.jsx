@@ -4,7 +4,8 @@ export default function Sidebar({ activeTab, setActiveTab }) {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'lookup', label: 'Domain Lookup', icon: '🔍' },
-    { id: 'reports', label: 'Submit Report', icon: '📝' },
+    { id: 'reports', label: 'Community Reports', icon: '📝' },
+    { id: 'moderation', label: 'Moderator Portal', icon: '🛡️' },
     { id: 'settings', label: 'System Settings', icon: '⚙️' }
   ];
 

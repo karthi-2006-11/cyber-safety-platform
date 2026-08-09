@@ -1,73 +1,148 @@
-const Website = require('../models/Website');
+const crypto = require('crypto');
 const UserReport = require('../models/UserReport');
 const Evidence = require('../models/Evidence');
-const { getDBStatus } = require('../config/db');
+const Website = require('../models/Website');
+const { REPORT_STATUS, EVIDENCE_TYPES, VERIFICATION_STATUS } = require('../../../shared/constants');
+const { normalizeAndValidate } = require('../pipeline/urlNormalizer');
 
-// In-memory fallback repository when DB is offline during phase 1 setup
-const inMemoryReports = [];
+/**
+ * Sanitizes input string to prevent XSS injection.
+ */
+function sanitizeText(str) {
+  if (typeof str !== 'string') return '';
+  return str
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .trim();
+}
 
-async function submitReport({ domain, category, description, evidenceText }) {
-  const dbStatus = getDBStatus();
+/**
+ * Validates external reference URLs for safety.
+ */
+function validateReferenceUrl(urlStr) {
+  if (!urlStr || typeof urlStr !== 'string') return null;
+  const trimmed = urlStr.trim();
+  if (trimmed === '') return null;
 
-  if (dbStatus.isConnected) {
-    let site = await Website.findOne({ domain });
-    if (!site) {
-      site = await Website.create({ domain });
+  try {
+    const parsed = new URL(trimmed);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+
+    const hostname = parsed.hostname.toLowerCase();
+    // Block internal IP ranges and localhost
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname.startsWith('10.') ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('172.16.')
+    ) {
+      return null;
     }
 
-    const report = await UserReport.create({
-      websiteId: site._id,
-      domain,
-      category,
-      description
+    return parsed.toString();
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Generates an anonymized reporter hash to track independent reporters without revealing identity.
+ */
+function generateReporterHash(reporterId, ipAddress = '127.0.0.1') {
+  const seed = reporterId ? String(reporterId) : String(ipAddress);
+  return 'rep_' + crypto.createHash('sha256').update(seed).digest('hex').slice(0, 12);
+}
+
+/**
+ * Submits a new community safety report with optional evidence attachments.
+ */
+async function submitReport({ domain, category, description, reporterId, reporterIp, evidenceList = [] }) {
+  const norm = normalizeAndValidate(domain);
+  if (!norm || !norm.domain) {
+    throw new Error('INVALID_DOMAIN');
+  }
+
+  const cleanDomain = norm.domain;
+  const cleanCategory = sanitizeText(category || 'OTHER');
+  const cleanDescription = sanitizeText(description || '');
+  const reporterHash = generateReporterHash(reporterId, reporterIp);
+
+  // Check or create Website record in DB
+  let website = await Website.findOne({ domain: cleanDomain });
+  if (!website) {
+    website = await Website.create({
+      domain: cleanDomain,
+      currentStatus: 'UNKNOWN',
+      lastAnalyzedAt: new Date()
     });
+  }
 
-    let evidenceObj = null;
-    if (evidenceText) {
-      evidenceObj = await Evidence.create({
-        reportId: report._id,
-        websiteId: site._id,
-        content: evidenceText
-      });
-    }
+  // Duplicate Check: Check if same reporterHash already submitted a pending/verified report for this domain
+  const existingReport = await UserReport.findOne({
+    websiteId: website._id,
+    reporterHash,
+    status: { $in: [REPORT_STATUS.PENDING, REPORT_STATUS.VERIFIED, REPORT_STATUS.ACTIONED] }
+  });
 
+  if (existingReport) {
     return {
-      success: true,
-      report,
-      evidence: evidenceObj,
-      persistedTo: 'DATABASE'
+      isDuplicate: true,
+      report: existingReport,
+      message: 'You have already submitted a report for this domain.'
     };
   }
 
-  // Fallback to in-memory store if DB not available
-  const report = {
-    id: `mem_report_${Date.now()}`,
-    domain,
-    category,
-    description,
-    evidenceText: evidenceText || null,
-    createdAt: new Date()
-  };
-  inMemoryReports.push(report);
+  // Create UserReport record
+  const report = await UserReport.create({
+    websiteId: website._id,
+    domain: cleanDomain,
+    reportedBy: reporterId || null,
+    reporterHash,
+    category: cleanCategory,
+    description: cleanDescription,
+    status: REPORT_STATUS.PENDING,
+    confidenceContribution: 0.1
+  });
 
-  return {
-    success: true,
-    report,
-    persistedTo: 'IN_MEMORY_STUB'
-  };
-}
+  // Attach evidence references
+  const createdEvidence = [];
+  if (Array.isArray(evidenceList) && evidenceList.length > 0) {
+    for (const item of evidenceList) {
+      const type = item.type && Object.values(EVIDENCE_TYPES).includes(item.type)
+        ? item.type
+        : EVIDENCE_TYPES.TEXT_EXPLANATION;
 
-async function getReportsForDomain(domain) {
-  const dbStatus = getDBStatus();
+      const title = sanitizeText(item.title || 'Report Evidence');
+      const content = sanitizeText(item.content || item.description || cleanDescription);
+      const referenceUrl = validateReferenceUrl(item.url || item.referenceUrl);
 
-  if (dbStatus.isConnected) {
-    return await UserReport.find({ domain }).sort({ createdAt: -1 });
+      const evRecord = await Evidence.create({
+        reportId: report._id,
+        websiteId: website._id,
+        type,
+        title,
+        content,
+        referenceUrl,
+        verificationStatus: VERIFICATION_STATUS.PENDING,
+        isVerified: false
+      });
+      createdEvidence.push(evRecord);
+    }
   }
 
-  return inMemoryReports.filter(r => r.domain === domain);
+  return {
+    isDuplicate: false,
+    report,
+    evidence: createdEvidence
+  };
 }
 
 module.exports = {
-  submitReport,
-  getReportsForDomain
+  sanitizeText,
+  validateReferenceUrl,
+  generateReporterHash,
+  submitReport
 };

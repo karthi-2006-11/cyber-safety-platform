@@ -1,47 +1,59 @@
-# Cyber Safety Platform — Monorepo
+# Cyber Safety Platform
 
-> **Core Mission**: *"Build something that has the ability to stop a cybercrime before the user becomes a victim."*
+> *"Build something that has the ability to stop a cybercrime before the user becomes a victim."*
 
-The Cyber Safety Platform is a background protection architecture designed to detect, warn, and block dangerous or high-confidence threat websites before users become victims of cybercrime.
-
----
-
-## Repository Structure
-
-- [`client/`](file:///d:/mini_project-1(AG)/client) — React 18 + Vite User Dashboard UI.
-- [`server/`](file:///d:/mini_project-1(AG)/server) — Node.js + Express.js API backend with Mongoose MongoDB schemas.
-- [`extension/`](file:///d:/mini_project-1(AG)/extension) — Chromium Manifest V3 browser protection extension.
-- [`shared/`](file:///d:/mini_project-1(AG)/shared) — Shared threat levels (`SAFE`, `SUSPICIOUS`, `HIGH_CONFIDENCE_THREAT`, `UNKNOWN`) and constants.
-- [`docs/`](file:///d:/mini_project-1(AG)/docs) — Technical documentation:
-  - [`docs/ARCHITECTURE.md`](file:///d:/mini_project-1(AG)/docs/ARCHITECTURE.md)
-  - [`docs/RUNNING.md`](file:///d:/mini_project-1(AG)/docs/RUNNING.md)
-  - [`docs/STATUS.md`](file:///d:/mini_project-1(AG)/docs/STATUS.md)
+The Cyber Safety Platform is a seriousness-driven cybersecurity solution providing real-time threat evaluation, evidence-backed risk analysis, community cybercrime reporting, trusted moderation workflows, and dynamic browser protection.
 
 ---
 
-## Quick Start
+## System Architecture Overview
 
-### 1. Start Server
+1. **Browser Protection Extension (`extension/`)**: Manifest V3 background service worker using `declarativeNetRequest` dynamic rules to block high-confidence malicious domains and render local explainable block pages (`blocked.html`).
+2. **Threat Analysis Engine (`server/src/pipeline/`)**: Decoupled 6-stage evaluation pipeline combining URL normalization, local reputation records, Google Web Risk API threat intelligence, community user reports, Wikipedia/Reddit public evidence, and explainable risk calculation.
+3. **Community Intelligence & Moderation (`server/src/services/report.service.js`)**: Anonymized reporter tracking (`independentReporterCount`), multi-evidence attachment, duplicate report filtering, and RBAC-protected moderator workflow.
+4. **User & Moderator Dashboard (`client/`)**: Modern React 18 + Vite interface with dark glassmorphism UI for inspecting threats, submitting community reports, and actioning pending threats.
+
+---
+
+## Key Features & Protection Rules
+
+- **Explainable Classification**: `SAFE`, `SUSPICIOUS`, `HIGH_CONFIDENCE_THREAT`, `UNKNOWN`.
+- **Strict Threat Promotion**: A single unverified report, Reddit post, or Wikipedia page will **NEVER** force `HIGH_CONFIDENCE_THREAT` or trigger automatic browser blocking.
+- **Fail-Safe Operation**: If external services (Google Web Risk, Reddit, Wikipedia) or the backend database are unreachable, the platform operates safely using cached and pre-synchronized DNR rules without blocking unrated sites.
+- **Anti-Abuse Safeguards**: XSS HTML tag sanitization, safe URL validation, anonymized reporter hashes, and RBAC-protected moderation endpoints.
+
+---
+
+## Getting Started & Running Locally
+
+### Prerequisites
+- Node.js >= 18.0.0
+- MongoDB running on `mongodb://127.0.0.1:27017`
+
+### Running Backend API Server
 ```bash
 cd server
 npm install
-npm run dev
+npm start
 ```
+Starts on `http://localhost:5000`.
 
-### 2. Start Client
+### Running User Dashboard Client
 ```bash
 cd client
 npm install
 npm run dev
 ```
+Opens on `http://localhost:3000`.
 
-### 3. Load Extension
-Load the `extension/` directory into Chrome/Chromium via `chrome://extensions/` (Developer Mode).
+### Running Automated Test Suite
+```bash
+cd server
+npm test
+```
+Executes all 71 unit and integration test cases across 7 test suites.
 
----
-
-## Important Security Principles
-
-1. **No Absolute Guarantees**: The system categorizes domains based on evidence into `SAFE`, `SUSPICIOUS`, `HIGH_CONFIDENCE_THREAT`, or `UNKNOWN`.
-2. **Zero Fake Threats**: No fake statistical generators or simulated threat alerts.
-3. **Environment Security**: All sensitive configurations are managed via `.env` with placeholder defaults in `.env.example`.
+### Loading Browser Extension
+1. Open Google Chrome and go to `chrome://extensions/`.
+2. Enable **Developer mode** toggle.
+3. Click **Load unpacked** and select the `extension/` directory.

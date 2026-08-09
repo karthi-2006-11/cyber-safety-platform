@@ -5,6 +5,7 @@ import NoticeBanner from './components/NoticeBanner';
 import ProtectionStatusCard from './components/ProtectionStatusCard';
 import DomainCheckSection from './components/DomainCheckSection';
 import ReportSubmitModal from './components/ReportSubmitModal';
+import ModeratorDashboard from './components/ModeratorDashboard';
 import DecisionsTable from './components/DecisionsTable';
 
 export default function App() {
@@ -54,8 +55,14 @@ export default function App() {
         )}
 
         {activeTab === 'reports' && (
-          <div style={{ maxWidth: '640px' }}>
+          <div style={{ maxWidth: '720px' }}>
             <ReportSubmitModal />
+          </div>
+        )}
+
+        {activeTab === 'moderation' && (
+          <div style={{ maxWidth: '800px' }}>
+            <ModeratorDashboard />
           </div>
         )}
 
@@ -72,6 +79,7 @@ export default function App() {
               <li><strong>Frontend:</strong> React 18 + Vite (Port 3000)</li>
               <li><strong>API Proxy Target:</strong> http://localhost:5000</li>
               <li><strong>Extension Target:</strong> Manifest V3 Engine</li>
+              <li><strong>Community Intelligence Engine:</strong> Phase 6 Active</li>
             </ul>
           </div>
         )}

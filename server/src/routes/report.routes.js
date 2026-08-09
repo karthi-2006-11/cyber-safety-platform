@@ -1,13 +1,12 @@
 const express = require('express');
-const { createReport, getReports } = require('../controllers/report.controller');
-const { validateDomainInput, validateReportInput } = require('../middleware/validateInput');
+const { handleReportSubmission, getMyReports } = require('../controllers/report.controller');
 
 const router = express.Router();
 
-// POST /api/v1/reports
-router.post('/reports', validateReportInput, createReport);
+// POST /api/v1/reports (Submit community report)
+router.post('/reports', handleReportSubmission);
 
-// GET /api/v1/reports?domain=example.com
-router.get('/reports', validateDomainInput, getReports);
+// GET /api/v1/reports/my-reports (View my submitted reports)
+router.get('/reports/my-reports', getMyReports);
 
 module.exports = router;
