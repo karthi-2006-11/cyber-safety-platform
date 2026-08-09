@@ -1,16 +1,30 @@
-const { THREAT_LEVELS, RISK_LEVELS, SIGNAL_SEVERITY } = require('../../../shared/constants');
+const {
+  THREAT_LEVELS,
+  RISK_LEVELS,
+  SIGNAL_SEVERITY,
+  EVIDENCE_SOURCES,
+  EVIDENCE_SOURCE_TYPES,
+  VERIFICATION_STATUS
+} = require('../../../shared/constants');
 
 /**
- * Pipeline Stage 5: Risk Calculator
- * Aggregates all collected threat signals (reputation, Google Web Risk, community reports) into an explainable decision.
+ * Pipeline Stage 6: Risk Calculator & Unified Evidence Assembler
+ * Aggregates signals and constructs unified explainable decision object.
  * 
  * Rules:
- * - Never claims 100% mathematical certainty or "guaranteed safe".
- * - Web Risk MALWARE/SOCIAL_ENGINEERING signals elevate decision to HIGH_CONFIDENCE_THREAT with high confidence.
+ * - Wikipedia and Reddit serve as SUPPORTING EVIDENCE / CONTEXT.
+ * - Wikipedia / Reddit entries do NOT automatically trigger HIGH_CONFIDENCE_THREAT.
  * - Single unverified PENDING report does NOT automatically trigger HIGH_CONFIDENCE_THREAT.
  * - REJECTED reports contribute 0 weight.
  */
-function calculateRisk(domain, reputationData = {}, webRiskData = {}, communityData = {}) {
+function calculateRisk(
+  domain,
+  reputationData = {},
+  webRiskData = {},
+  communityData = {},
+  wikipediaData = {},
+  redditData = {}
+) {
   const allSignals = [
     ...(reputationData.signals || []),
     ...(webRiskData.signals || []),
@@ -29,14 +43,62 @@ function calculateRisk(domain, reputationData = {}, webRiskData = {}, communityD
         hasCriticalThreatSignal = true;
       }
     } else if (signal.severity === SIGNAL_SEVERITY.INFO && signal.description) {
-      // Include informational notes (e.g. no Web Risk match, rejected reports notice)
       reasons.push(signal.description);
+    }
+  }
+
+  // Assemble Unified Evidence Array
+  const unifiedEvidence = [];
+
+  // 1. Google Web Risk Evidence
+  if (webRiskData.checked && webRiskData.matchFound && Array.isArray(webRiskData.threatTypes)) {
+    for (const threatType of webRiskData.threatTypes) {
+      unifiedEvidence.push({
+        source: EVIDENCE_SOURCES.GOOGLE_WEB_RISK,
+        sourceType: EVIDENCE_SOURCE_TYPES.SECURITY_INTELLIGENCE,
+        title: `Google Web Risk: ${threatType}`,
+        url: 'https://webrisk.googleapis.com/',
+        excerpt: `Domain flagged as ${threatType} by Google Web Risk Threat Intelligence Engine.`,
+        relevance: 'HIGH',
+        verificationStatus: VERIFICATION_STATUS.SYSTEM_DETECTED,
+        retrievedAt: new Date().toISOString()
+      });
+    }
+  }
+
+  // 2. User Community Evidence
+  if (Array.isArray(communityData.evidence)) {
+    for (const ev of communityData.evidence) {
+      unifiedEvidence.push({
+        source: EVIDENCE_SOURCES.COMMUNITY_REPORT,
+        sourceType: EVIDENCE_SOURCE_TYPES.USER_REPORT,
+        title: `Community Evidence (${ev.type || 'USER_SUBMISSION'})`,
+        url: ev.content && ev.content.startsWith('http') ? ev.content : null,
+        excerpt: ev.content,
+        relevance: 'HIGH',
+        verificationStatus: ev.isVerified ? VERIFICATION_STATUS.VERIFIED : VERIFICATION_STATUS.PENDING,
+        retrievedAt: new Date().toISOString()
+      });
+    }
+  }
+
+  // 3. Wikipedia Public Contextual Evidence
+  if (Array.isArray(wikipediaData.evidence)) {
+    for (const item of wikipediaData.evidence) {
+      unifiedEvidence.push(item);
+    }
+  }
+
+  // 4. Reddit Public Contextual Evidence
+  if (Array.isArray(redditData.evidence)) {
+    for (const item of redditData.evidence) {
+      unifiedEvidence.push(item);
     }
   }
 
   let classification = THREAT_LEVELS.UNKNOWN;
   let riskLevel = RISK_LEVELS.NONE;
-  let confidence = 0.50; // Default baseline confidence
+  let confidence = 0.50; // Baseline confidence
 
   // Official Website DB record override if present
   if (reputationData.found && reputationData.websiteRecord) {
@@ -55,7 +117,7 @@ function calculateRisk(domain, reputationData = {}, webRiskData = {}, communityD
       confidence = 0.85;
     }
   } else {
-    // Decision matrix based on aggregated external threat intel & community signals
+    // Decision matrix based on aggregated threat intel & community signals
     if (totalScore >= 75 || hasCriticalThreatSignal) {
       classification = THREAT_LEVELS.HIGH_CONFIDENCE_THREAT;
       riskLevel = RISK_LEVELS.HIGH;
@@ -84,7 +146,7 @@ function calculateRisk(domain, reputationData = {}, webRiskData = {}, communityD
     riskLevel,
     confidence: Number(confidence.toFixed(2)),
     reasons,
-    evidence: communityData.evidence || [],
+    evidence: unifiedEvidence,
     reports: communityData.reports || [],
     signalsCount: allSignals.length,
     analyzedAt: new Date().toISOString()

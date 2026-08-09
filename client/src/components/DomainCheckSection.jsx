@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import EvidenceSection from './EvidenceSection';
 
 export default function DomainCheckSection() {
   const [domainInput, setDomainInput] = useState('');
@@ -37,14 +38,14 @@ export default function DomainCheckSection() {
         <span>🔍</span>
       </div>
       <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-        Run domain through the real threat analysis pipeline (reputation + community reports).
+        Run domain through threat analysis pipeline (Reputation, Google Web Risk, Community Reports, Wikipedia & Reddit).
       </p>
 
       <form onSubmit={handleCheck} className="search-box">
         <input
           type="text"
           className="input-field"
-          placeholder="e.g. example.com:8080/path or suspicious-domain.com"
+          placeholder="e.g. example.com or suspicious-domain.com"
           value={domainInput}
           onChange={(e) => setDomainInput(e.target.value)}
         />
@@ -89,19 +90,7 @@ export default function DomainCheckSection() {
             </div>
           )}
 
-          {result.reports && result.reports.length > 0 && (
-            <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed var(--border-subtle)' }}>
-              <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>
-                Community Reports ({result.reports.length})
-              </div>
-              {result.reports.map((rep, idx) => (
-                <div key={idx} style={{ fontSize: '12px', marginBottom: '6px', background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '4px' }}>
-                  <span style={{ fontWeight: '600', color: 'var(--primary-blue)' }}>[{rep.category}]</span> {rep.description}
-                  <span style={{ marginLeft: '8px', fontSize: '10px', color: 'var(--text-dim)' }}>({rep.status})</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <EvidenceSection evidence={result.evidence} />
         </div>
       )}
     </div>
