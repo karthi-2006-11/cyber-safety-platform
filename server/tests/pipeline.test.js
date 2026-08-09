@@ -3,7 +3,6 @@ const assert = require('node:assert/strict');
 const { extractDomain, isValidDomain } = require('../src/utilities/urlHelper');
 const { normalizeAndValidate } = require('../src/pipeline/urlNormalizer');
 const { calculateRisk } = require('../src/pipeline/riskCalculator');
-const { evaluateCommunityReports } = require('../src/pipeline/communityReportEvaluator');
 const { THREAT_LEVELS, RISK_LEVELS, SIGNAL_SEVERITY, REPORT_STATUS } = require('../../shared/constants');
 
 test('1. Valid Domain Extraction & Validation', () => {
@@ -41,9 +40,10 @@ test('6. Domain with Path and Query Handling', () => {
 
 test('7. Unknown Domain Risk Calculation', () => {
   const mockReputation = { found: false, signals: [] };
+  const mockWebRisk = { checked: false, signals: [] };
   const mockCommunity = { signals: [], reports: [], evidence: [] };
 
-  const decision = calculateRisk('unknown-clean-domain.com', mockReputation, mockCommunity);
+  const decision = calculateRisk('unknown-clean-domain.com', mockReputation, mockWebRisk, mockCommunity);
 
   assert.equal(decision.domain, 'unknown-clean-domain.com');
   assert.equal(decision.classification, THREAT_LEVELS.UNKNOWN);
@@ -54,6 +54,7 @@ test('7. Unknown Domain Risk Calculation', () => {
 
 test('8. Single Pending Community Report Signal', () => {
   const mockReputation = { found: false, signals: [] };
+  const mockWebRisk = { checked: false, signals: [] };
   const mockCommunity = {
     signals: [{
       type: 'PENDING_COMMUNITY_REPORTS',
@@ -68,7 +69,7 @@ test('8. Single Pending Community Report Signal', () => {
     evidence: []
   };
 
-  const decision = calculateRisk('test-pending-domain.com', mockReputation, mockCommunity);
+  const decision = calculateRisk('test-pending-domain.com', mockReputation, mockWebRisk, mockCommunity);
 
   assert.equal(decision.classification, THREAT_LEVELS.SUSPICIOUS);
   assert.equal(decision.riskLevel, RISK_LEVELS.LOW);
@@ -78,6 +79,7 @@ test('8. Single Pending Community Report Signal', () => {
 
 test('9. Multiple Pending Community Reports Signal', () => {
   const mockReputation = { found: false, signals: [] };
+  const mockWebRisk = { checked: false, signals: [] };
   const mockCommunity = {
     signals: [{
       type: 'PENDING_COMMUNITY_REPORTS',
@@ -96,16 +98,17 @@ test('9. Multiple Pending Community Reports Signal', () => {
     evidence: []
   };
 
-  const decision = calculateRisk('test-multi-pending-domain.com', mockReputation, mockCommunity);
+  const decision = calculateRisk('test-multi-pending-domain.com', mockReputation, mockWebRisk, mockCommunity);
 
   assert.equal(decision.classification, THREAT_LEVELS.SUSPICIOUS);
   assert.equal(decision.riskLevel, RISK_LEVELS.MEDIUM);
-  assert.equal(decision.confidence, 0.70);
+  assert.equal(decision.confidence, 0.75);
   assert.equal(decision.reports.length, 3);
 });
 
 test('10. Rejected Community Reports Handling (Zero Weight)', () => {
   const mockReputation = { found: false, signals: [] };
+  const mockWebRisk = { checked: false, signals: [] };
   const mockCommunity = {
     signals: [{
       type: 'REJECTED_COMMUNITY_REPORTS',
@@ -120,7 +123,7 @@ test('10. Rejected Community Reports Handling (Zero Weight)', () => {
     evidence: []
   };
 
-  const decision = calculateRisk('test-rejected-report-domain.com', mockReputation, mockCommunity);
+  const decision = calculateRisk('test-rejected-report-domain.com', mockReputation, mockWebRisk, mockCommunity);
 
   assert.equal(decision.classification, THREAT_LEVELS.UNKNOWN);
   assert.equal(decision.riskLevel, RISK_LEVELS.NONE);
@@ -141,9 +144,10 @@ test('11. Actioned High-Confidence Threat Decision', () => {
       reliability: 0.95
     }]
   };
+  const mockWebRisk = { checked: false, signals: [] };
   const mockCommunity = { signals: [], reports: [], evidence: [] };
 
-  const decision = calculateRisk('confirmed-malicious-domain.com', mockReputation, mockCommunity);
+  const decision = calculateRisk('confirmed-malicious-domain.com', mockReputation, mockWebRisk, mockCommunity);
 
   assert.equal(decision.classification, THREAT_LEVELS.HIGH_CONFIDENCE_THREAT);
   assert.equal(decision.riskLevel, RISK_LEVELS.HIGH);

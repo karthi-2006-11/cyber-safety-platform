@@ -4,12 +4,12 @@ This guide outlines setup requirements and execution commands for launching all 
 
 ---
 
-## Prerequisites
+## Environment & Prerequisites
 
 - **Node.js**: v18.0.0 or higher
 - **npm**: v9.0.0 or higher
-- **MongoDB** (Optional for Phase 1): Local instance running at `mongodb://127.0.0.1:27017` or remote MongoDB URI in `server/.env`. If MongoDB is not running, the server runs gracefully in fallback mode.
-- **Browser**: Google Chrome, Brave, Edge, or any Chromium-based browser (for extension loading).
+- **MongoDB** (Optional): Local instance running at `mongodb://127.0.0.1:27017` or remote MongoDB URI in `server/.env`. If MongoDB is not running, the server runs gracefully in fallback mode.
+- **Google Web Risk API Key** (Optional): Set `GOOGLE_WEB_RISK_API_KEY=your_key` in `server/.env` for real-time Google threat lookup. If missing, external checks are safely skipped with fallback to local/community signals.
 
 ---
 
@@ -20,20 +20,26 @@ This guide outlines setup requirements and execution commands for launching all 
 # Navigate to server directory
 cd server
 
-# Environment variables setup (already prepared with defaults)
+# Environment variables setup
 cp .env.example .env
 
 # Install dependencies
 npm install
 
+# Run automated tests
+npm test
+
 # Start backend in development mode (port 5000)
 npm run dev
 ```
 
-### Verification Endpoint
-Open browser or run curl:
+### Verification Endpoints
 ```bash
+# Health Check
 curl http://localhost:5000/api/v1/health
+
+# Threat Pipeline Inspection
+curl "http://localhost:5000/api/v1/threats/check?domain=example.com"
 ```
 
 ---

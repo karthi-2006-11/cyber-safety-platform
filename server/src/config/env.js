@@ -9,5 +9,6 @@ module.exports = {
   nodeEnv: process.env.NODE_ENV || 'development',
   mongoUri: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/cyber_safety_db',
   corsOrigin: process.env.CORS_ORIGIN || '*',
-  jwtSecret: process.env.JWT_SECRET || 'dev_secret_key'
+  jwtSecret: process.env.JWT_SECRET || 'dev_secret_key',
+  googleWebRiskApiKey: process.env.GOOGLE_WEB_RISK_API_KEY || ''
 };
