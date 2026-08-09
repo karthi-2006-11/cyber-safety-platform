@@ -13,6 +13,21 @@ const THREAT_LEVELS = Object.freeze({
   UNKNOWN: 'UNKNOWN'
 });
 
+const RISK_LEVELS = Object.freeze({
+  NONE: 'NONE',
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH'
+});
+
+const SIGNAL_SEVERITY = Object.freeze({
+  INFO: 'INFO',
+  LOW: 'LOW',
+  MEDIUM: 'MEDIUM',
+  HIGH: 'HIGH',
+  CRITICAL: 'CRITICAL'
+});
+
 const REPORT_STATUS = Object.freeze({
   PENDING: 'PENDING',
   REVIEWED: 'REVIEWED',
@@ -28,6 +43,8 @@ const EVIDENCE_TYPES = Object.freeze({
 
 module.exports = {
   THREAT_LEVELS,
+  RISK_LEVELS,
+  SIGNAL_SEVERITY,
   REPORT_STATUS,
   EVIDENCE_TYPES
 };

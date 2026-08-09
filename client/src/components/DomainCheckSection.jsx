@@ -33,23 +33,23 @@ export default function DomainCheckSection() {
   return (
     <div className="card">
       <div className="card-title">
-        <span>Domain Safety Inspection</span>
+        <span>Domain Threat Pipeline Analysis</span>
         <span>🔍</span>
       </div>
       <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-        Query official database records for a target website domain.
+        Run domain through the real threat analysis pipeline (reputation + community reports).
       </p>
 
       <form onSubmit={handleCheck} className="search-box">
         <input
           type="text"
           className="input-field"
-          placeholder="e.g. suspicious-example.com"
+          placeholder="e.g. example.com:8080/path or suspicious-domain.com"
           value={domainInput}
           onChange={(e) => setDomainInput(e.target.value)}
         />
         <button type="submit" className="btn btn-primary" disabled={loading}>
-          {loading ? 'Checking...' : 'Check Domain'}
+          {loading ? 'Analyzing...' : 'Analyze Domain'}
         </button>
       </form>
 
@@ -60,18 +60,48 @@ export default function DomainCheckSection() {
       )}
 
       {result && (
-        <div style={{ marginTop: '16px', padding: '14px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: '600' }}>{result.domain}</span>
-            <span className={`badge ${result.status.toLowerCase()}`}>
-              {result.status.replace(/_/g, ' ')}
-            </span>
+        <div style={{ marginTop: '16px', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: '600', fontSize: '15px' }}>{result.domain}</span>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <span className={`badge ${result.classification.toLowerCase()}`}>
+                {result.classification.replace(/_/g, ' ')}
+              </span>
+              <span className="badge unknown" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                RISK: {result.riskLevel}
+              </span>
+            </div>
           </div>
 
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '10px' }}>
-            <p><strong>Source:</strong> {result.source}</p>
-            {result.note && <p style={{ marginTop: '4px', fontStyle: 'italic' }}>{result.note}</p>}
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px', background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '6px' }}>
+            <div><strong>Confidence Score:</strong> {(result.confidence * 100).toFixed(0)}%</div>
+            <div><strong>Analyzed At:</strong> {new Date(result.analyzedAt).toLocaleTimeString()}</div>
           </div>
+
+          {result.reasons && result.reasons.length > 0 && (
+            <div style={{ marginTop: '10px' }}>
+              <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>Analysis Reasons</div>
+              <ul style={{ paddingLeft: '18px', fontSize: '12px', color: 'var(--text-main)', lineHeight: '1.6' }}>
+                {result.reasons.map((reason, idx) => (
+                  <li key={idx}>{reason}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {result.reports && result.reports.length > 0 && (
+            <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px dashed var(--border-subtle)' }}>
+              <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '4px', fontWeight: '600' }}>
+                Community Reports ({result.reports.length})
+              </div>
+              {result.reports.map((rep, idx) => (
+                <div key={idx} style={{ fontSize: '12px', marginBottom: '6px', background: 'rgba(255,255,255,0.02)', padding: '6px 8px', borderRadius: '4px' }}>
+                  <span style={{ fontWeight: '600', color: 'var(--primary-blue)' }}>[{rep.category}]</span> {rep.description}
+                  <span style={{ marginLeft: '8px', fontSize: '10px', color: 'var(--text-dim)' }}>({rep.status})</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
