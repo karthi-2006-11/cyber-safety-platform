@@ -77,8 +77,8 @@ export default function ModeratorDashboard() {
       try {
         await login(email, pass);
       } catch (e) {
-        // If account doesn't exist yet, register it
-        await register(email, pass, `${targetRole} Account`, targetRole);
+        // If account doesn't exist yet, register it as normal USER
+        await register(email, pass, `${targetRole} Account`);
       }
     } catch (err) {
       setActionMessage({ type: 'error', text: err.message });

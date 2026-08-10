@@ -8,10 +8,12 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /**
  * POST /api/v1/auth/register
  * Register a new user account safely.
+ * CRITICAL SECURITY CONTRACT: Public registration MUST ALWAYS assign role 'USER'.
+ * Client-provided role parameters (req.body.role, x-user-role, x-user-id, etc.) are UNCONDITIONALLY IGNORED.
  */
 async function register(req, res, next) {
   try {
-    const { email, password, name, role } = req.body;
+    const { email, password, name } = req.body;
 
     if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
       return res.status(400).json({
@@ -32,8 +34,9 @@ async function register(req, res, next) {
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = sanitizeText(name || '');
     
-    // Assign role safely: default to USER unless specified role is allowed
-    const assignedRole = (role === 'MODERATOR' || role === 'ADMIN') ? role : 'USER';
+    // CRITICAL SECURITY FIX: Unconditionally enforce role 'USER' for public registration.
+    // Never trust req.body.role, x-user-role, or any client input.
+    const assignedRole = 'USER';
 
     const dbStatus = getDBStatus();
     if (!dbStatus.isConnected) {
@@ -159,8 +162,55 @@ async function getMe(req, res) {
   });
 }
 
+/**
+ * POST /api/v1/auth/promote-user
+ * Protected Administrative User Role Promotion Endpoint.
+ * Requires ADMIN role. Normal users or moderators cannot promote users or self-promote.
+ */
+async function promoteUser(req, res, next) {
+  try {
+    const { targetEmail, targetUserId, newRole } = req.body;
+
+    if (!['USER', 'MODERATOR', 'ADMIN'].includes(newRole)) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_ROLE',
+        message: 'Role must be one of: USER, MODERATOR, ADMIN'
+      });
+    }
+
+    const query = targetUserId ? { _id: targetUserId } : { email: (targetEmail || '').trim().toLowerCase() };
+    const user = await User.findOne(query);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'USER_NOT_FOUND',
+        message: 'Target user account not found.'
+      });
+    }
+
+    user.role = newRole;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: `User ${user.email} role updated to ${newRole}.`,
+      user: {
+        id: String(user._id),
+        email: user.email,
+        name: user.name,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   register,
   login,
-  getMe
+  getMe,
+  promoteUser
 };

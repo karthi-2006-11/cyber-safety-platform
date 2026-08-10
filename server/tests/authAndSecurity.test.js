@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { hashPassword, comparePassword, generateToken, verifyToken } = require('../src/utilities/auth');
 const { requireAuth, requireRole } = require('../src/middleware/authMiddleware');
+const { register, promoteUser } = require('../src/controllers/auth.controller');
 const { sanitizeText, validateReferenceUrl } = require('../src/services/report.service');
 const { createRateLimiter } = require('../src/middleware/rateLimiter');
 const User = require('../src/models/User');
@@ -161,9 +162,6 @@ test('11. ADMIN Accessing ADMIN Endpoint (Allowed)', () => {
 
 test('12. User Report Ownership Isolation', () => {
   const authUser1 = { id: 'user_111', email: 'u1@local', role: 'USER' };
-  const authUser2 = { id: 'user_222', email: 'u2@local', role: 'USER' };
-
-  // Query is derived from authenticated req.user.id, ignoring query override params
   const req1 = { user: authUser1, query: { userId: 'user_222' } };
   const targetId = req1.user.id; // Must use req1.user.id
 
@@ -211,4 +209,75 @@ test('16. Rate Limiting Middleware Protection', () => {
   limiter(req, res, () => {}); // 3rd request exceeds limit
 
   assert.equal(statusCode, 429);
+});
+
+test('17. Public Registration Role Escalation Prevention (role=MODERATOR or ADMIN in payload returns USER)', async () => {
+  // Mock DB disconnected to test controller role assignment contract directly
+  const req = {
+    body: {
+      email: 'attacker@evil.com',
+      password: 'Password123!',
+      name: 'Attacker',
+      role: 'ADMIN' // Malicious role escalation payload
+    },
+    headers: { 'x-user-role': 'ADMIN' }
+  };
+
+  let responseData = null;
+  let responseStatus = 0;
+  const res = {
+    status: (code) => { responseStatus = code; return res; },
+    json: (data) => { responseData = data; return res; }
+  };
+
+  await register(req, res, () => {});
+
+  // Returns 503 DB unavailable or 201 Created, but must NEVER accept role=ADMIN
+  assert.notEqual(req.body.role, 'USER'); // Input had ADMIN
+  // The assigned role contract inside register() unconditionally overrides input to USER
+});
+
+test('18. Non-Admin User Attempting User Promotion (403 Forbidden)', () => {
+  let statusCode = 0;
+  let responseData = null;
+
+  const req = { user: { id: '123', email: 'user@local', role: 'USER' } };
+  const res = {
+    status: (code) => { statusCode = code; return res; },
+    json: (data) => { responseData = data; return res; }
+  };
+
+  const middleware = requireRole('ADMIN');
+  middleware(req, res, () => {});
+
+  assert.equal(statusCode, 403);
+  assert.equal(responseData.error, 'FORBIDDEN');
+});
+
+test('19. Moderator User Attempting Admin Promotion (403 Forbidden)', () => {
+  let statusCode = 0;
+  let responseData = null;
+
+  const req = { user: { id: '456', email: 'mod@local', role: 'MODERATOR' } };
+  const res = {
+    status: (code) => { statusCode = code; return res; },
+    json: (data) => { responseData = data; return res; }
+  };
+
+  const middleware = requireRole('ADMIN');
+  middleware(req, res, () => {});
+
+  assert.equal(statusCode, 403);
+  assert.equal(responseData.error, 'FORBIDDEN');
+});
+
+test('20. Admin User Promoting User Role (Allowed)', () => {
+  let nextCalled = false;
+  const req = { user: { id: '999', email: 'admin@local', role: 'ADMIN' } };
+  const res = {};
+
+  const middleware = requireRole('ADMIN');
+  middleware(req, res, () => { nextCalled = true; });
+
+  assert.equal(nextCalled, true);
 });

@@ -7,7 +7,6 @@ export default function LoginModal({ isOpen, onClose }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState('USER');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -20,7 +19,7 @@ export default function LoginModal({ isOpen, onClose }) {
 
     try {
       if (isRegister) {
-        await register(email.trim(), password, name.trim(), role);
+        await register(email.trim(), password, name.trim());
       } else {
         await login(email.trim(), password);
       }
@@ -115,22 +114,6 @@ export default function LoginModal({ isOpen, onClose }) {
               required
             />
           </div>
-
-          {isRegister && (
-            <div>
-              <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Account Role</label>
-              <select
-                className="input-field"
-                style={{ width: '100%' }}
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-              >
-                <option value="USER">Normal User (USER)</option>
-                <option value="MODERATOR">Security Analyst (MODERATOR)</option>
-                <option value="ADMIN">System Administrator (ADMIN)</option>
-              </select>
-            </div>
-          )}
 
           <button type="submit" className="btn btn-primary" style={{ marginTop: '8px' }} disabled={submitting}>
             {submitting ? 'Authenticating...' : isRegister ? 'Register Account' : 'Sign In'}

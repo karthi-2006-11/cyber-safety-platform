@@ -52,11 +52,11 @@ export function AuthProvider({ children }) {
     return json.user;
   };
 
-  const register = async (email, password, name, role) => {
+  const register = async (email, password, name) => {
     const res = await fetch('/api/v1/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, name, role })
+      body: JSON.stringify({ email, password, name })
     });
     const json = await res.json();
     if (!res.ok || !json.success) {
