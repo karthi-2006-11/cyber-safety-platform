@@ -1,6 +1,6 @@
 const { submitReport } = require('../services/report.service');
 const UserReport = require('../models/UserReport');
-const Evidence = require('../models/Evidence');
+const logger = require('../utilities/logger');
 
 /**
  * POST /api/v1/reports
@@ -16,7 +16,8 @@ async function handleReportSubmission(req, res, next) {
       return res.status(400).json({
         success: false,
         error: 'INVALID_INPUT',
-        message: 'Domain and description are required.'
+        message: 'Domain and description are required.',
+        requestId: req.id || null
       });
     }
 
@@ -29,6 +30,13 @@ async function handleReportSubmission(req, res, next) {
       evidenceList
     });
 
+    logger.info(`Community report submitted for domain ${domain}`, {
+      domain,
+      category,
+      isDuplicate: result.isDuplicate,
+      status: result.report.status
+    }, req.id);
+
     if (result.isDuplicate) {
       return res.status(200).json({
         success: true,
@@ -40,7 +48,8 @@ async function handleReportSubmission(req, res, next) {
           category: result.report.category,
           status: result.report.status,
           createdAt: result.report.createdAt
-        }
+        },
+        requestId: req.id || null
       });
     }
 
@@ -55,14 +64,16 @@ async function handleReportSubmission(req, res, next) {
         status: result.report.status,
         createdAt: result.report.createdAt
       },
-      evidenceCount: result.evidence ? result.evidence.length : 0
+      evidenceCount: result.evidence ? result.evidence.length : 0,
+      requestId: req.id || null
     });
   } catch (error) {
     if (error.message === 'INVALID_DOMAIN') {
       return res.status(400).json({
         success: false,
         error: 'INVALID_DOMAIN',
-        message: 'Provided domain name is invalid.'
+        message: 'Provided domain name is invalid.',
+        requestId: req.id || null
       });
     }
     next(error);
@@ -71,7 +82,7 @@ async function handleReportSubmission(req, res, next) {
 
 /**
  * GET /api/v1/reports/my-reports
- * Returns public reports submitted by the current session/ip.
+ * Returns public reports submitted by the current authenticated user/ip with pagination.
  */
 async function getMyReports(req, res, next) {
   try {
@@ -81,11 +92,24 @@ async function getMyReports(req, res, next) {
     const seed = reporterId ? String(reporterId) : String(reporterIp);
     const reporterHash = 'rep_' + crypto.createHash('sha256').update(seed).digest('hex').slice(0, 12);
 
-    const reports = await UserReport.find({ reporterHash }).sort({ createdAt: -1 });
+    // Bounded Pagination Parameters (max limit = 50)
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const skip = (page - 1) * limit;
+
+    const query = { reporterHash };
+    const total = await UserReport.countDocuments(query);
+    const reports = await UserReport.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
     res.status(200).json({
       success: true,
       count: reports.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit) || 1,
       reports: reports.map(r => ({
         id: r._id,
         domain: r.domain,
@@ -93,7 +117,8 @@ async function getMyReports(req, res, next) {
         description: r.description,
         status: r.status,
         createdAt: r.createdAt
-      }))
+      })),
+      requestId: req.id || null
     });
   } catch (error) {
     next(error);

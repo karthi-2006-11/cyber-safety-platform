@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const { REPORT_STATUS } = require('../../../shared/constants');
 
 /**
- * UserReport Entity Schema — Phase 6 Community Intelligence
+ * UserReport Entity Schema — Phase 6 & Phase 8 Reliability Indexing
  */
 const userReportSchema = new mongoose.Schema({
   websiteId: {
@@ -21,7 +21,8 @@ const userReportSchema = new mongoose.Schema({
   reportedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    default: null
+    default: null,
+    index: true
   },
   reporterHash: {
     type: String,
@@ -55,5 +56,8 @@ const userReportSchema = new mongoose.Schema({
     moderationNotes: { type: String, default: null }
   }
 }, { timestamps: true });
+
+// Compound index for efficient moderation status sorting
+userReportSchema.index({ status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('UserReport', userReportSchema);

@@ -1,11 +1,12 @@
 const dotenv = require('dotenv');
 const path = require('path');
+const { validateEnv } = require('./envValidator');
 
 // Load environment variables from .env file
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-module.exports = {
-  port: process.env.PORT || 5000,
+const config = {
+  port: parseInt(process.env.PORT, 10) || 5000,
   nodeEnv: process.env.NODE_ENV || 'development',
   mongoUri: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/cyber_safety_db',
   corsOrigin: process.env.CORS_ORIGIN || '*',
@@ -15,3 +16,17 @@ module.exports = {
   redditClientId: process.env.REDDIT_CLIENT_ID || '',
   redditClientSecret: process.env.REDDIT_CLIENT_SECRET || ''
 };
+
+// Execute validation on module import
+try {
+  const validation = validateEnv(config);
+  if (validation.missingOptional.length > 0 && config.nodeEnv !== 'test') {
+    console.info(`[CONFIG INFO] Optional integrations unconfigured: ${validation.missingOptional.join('; ')}`);
+  }
+} catch (err) {
+  if (config.nodeEnv !== 'test') {
+    console.error(`[CONFIG ERROR] ${err.message}`);
+  }
+}
+
+module.exports = config;

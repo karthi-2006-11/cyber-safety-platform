@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const env = require('./env');
+const logger = require('../utilities/logger');
 
 let isConnected = false;
 
@@ -8,24 +9,46 @@ const connectDB = async () => {
 
   try {
     const conn = await mongoose.connect(env.mongoUri, {
-      serverSelectionTimeoutMS: 5000 // Timeout after 5s instead of hanging indefinitely
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      maxPoolSize: 10
     });
 
     isConnected = true;
-    console.log(`[Database] MongoDB connected: ${conn.connection.host}`);
+    logger.info(`[Database] MongoDB connected successfully to host: ${conn.connection.host}`);
+
+    mongoose.connection.on('disconnected', () => {
+      isConnected = false;
+      logger.warn('[Database] MongoDB connection lost.');
+    });
+
+    mongoose.connection.on('reconnected', () => {
+      isConnected = true;
+      logger.info('[Database] MongoDB connection re-established.');
+    });
   } catch (error) {
-    console.warn(`[Database Warning] Could not connect to MongoDB at ${env.mongoUri}: ${error.message}`);
-    console.warn(`[Database Warning] Server running with degraded database connectivity.`);
+    logger.warn(`[Database Warning] Could not connect to MongoDB at ${env.mongoUri}: ${error.message}`);
+    logger.warn('[Database Warning] Server running in degraded mode with memory fallbacks.');
     isConnected = false;
+  }
+};
+
+const disconnectDB = async () => {
+  if (isConnected) {
+    await mongoose.disconnect();
+    isConnected = false;
+    logger.info('[Database] MongoDB connection closed gracefully.');
   }
 };
 
 const getDBStatus = () => ({
   isConnected,
-  uri: env.mongoUri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@') // Mask credentials if present
+  uri: env.mongoUri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')
 });
 
 module.exports = {
   connectDB,
+  disconnectDB,
   getDBStatus
 };

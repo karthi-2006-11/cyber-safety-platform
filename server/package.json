@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "node --test tests/pipeline.test.js tests/webRisk.test.js tests/wikipedia.test.js tests/reddit.test.js tests/combinedEvidence.test.js tests/extensionIntegration.test.js tests/communityIntelligence.test.js tests/authAndSecurity.test.js"
+    "test": "node --test tests/pipeline.test.js tests/webRisk.test.js tests/wikipedia.test.js tests/reddit.test.js tests/combinedEvidence.test.js tests/extensionIntegration.test.js tests/communityIntelligence.test.js tests/authAndSecurity.test.js tests/productionReliability.test.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
