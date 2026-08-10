@@ -27,7 +27,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Fallback: Query backend threat check if not cached locally
   if (!decision) {
     try {
-      const res = await fetch(`http://localhost:5000/api/v1/threats/check?domain=${encodeURIComponent(domain)}`);
+      const apiBase = typeof CONFIG !== 'undefined' ? CONFIG.API_BASE_URL : 'http://localhost:5000/api/v1';
+      const res = await fetch(`${apiBase}/threats/check?domain=${encodeURIComponent(domain)}`);
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.data) {
@@ -126,10 +127,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   dashboardBtn.addEventListener('click', () => {
+    const dashboardUrl = typeof CONFIG !== 'undefined' ? CONFIG.DASHBOARD_URL : 'http://localhost:3000';
     if (typeof chrome !== 'undefined' && chrome.tabs) {
-      chrome.tabs.create({ url: 'http://localhost:3000' });
+      chrome.tabs.create({ url: dashboardUrl });
     } else {
-      window.open('http://localhost:3000', '_blank');
+      window.open(dashboardUrl, '_blank');
     }
   });
 });

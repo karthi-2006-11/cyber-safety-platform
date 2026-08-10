@@ -3,10 +3,10 @@
  * Phase 5 Automatic Browser Protection & Blocking Engine
  */
 
-// Import dynamic DNR rule manager helper functions
-importScripts('ruleManager.js');
+// Import dynamic configuration and DNR rule manager helper functions
+importScripts('config.js', 'ruleManager.js');
 
-const API_BASE_URL = 'http://localhost:5000/api/v1';
+const API_BASE_URL = typeof CONFIG !== 'undefined' ? CONFIG.API_BASE_URL : 'http://localhost:5000/api/v1';
 
 // Synchronize rules on startup
 chrome.runtime.onInstalled.addListener(() => {

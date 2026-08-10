@@ -9,7 +9,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Check Backend health and set protection active label
   try {
-    const healthRes = await fetch('http://localhost:5000/api/v1/health');
+    const apiBase = typeof CONFIG !== 'undefined' ? CONFIG.API_BASE_URL : 'http://localhost:5000/api/v1';
+    const healthRes = await fetch(`${apiBase}/health`);
     if (healthRes.ok) {
       dotEl.className = 'status-dot online';
       labelEl.textContent = 'Protection Active';
@@ -59,10 +60,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   openBtn.addEventListener('click', () => {
+    const dashboardUrl = typeof CONFIG !== 'undefined' ? CONFIG.DASHBOARD_URL : 'http://localhost:3000';
     if (typeof chrome !== 'undefined' && chrome.tabs) {
-      chrome.tabs.create({ url: 'http://localhost:3000' });
+      chrome.tabs.create({ url: dashboardUrl });
     } else {
-      window.open('http://localhost:3000', '_blank');
+      window.open(dashboardUrl, '_blank');
     }
   });
 });

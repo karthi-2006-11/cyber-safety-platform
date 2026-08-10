@@ -76,8 +76,8 @@ export default function App() {
               Current client configuration parameters:
             </p>
             <ul style={{ fontSize: '13px', paddingLeft: '20px', color: 'var(--text-main)', lineHeight: '1.8' }}>
-              <li><strong>Frontend:</strong> React 18 + Vite (Port 3000)</li>
-              <li><strong>API Proxy Target:</strong> http://localhost:5000</li>
+              <li><strong>Frontend:</strong> React 18 + Vite</li>
+              <li><strong>API Target:</strong> {import.meta.env.VITE_API_BASE_URL || '/api/v1 (Dev Proxy)'}</li>
               <li><strong>Extension Target:</strong> Manifest V3 Engine</li>
               <li><strong>Community Intelligence Engine:</strong> Phase 6 Active</li>
             </ul>

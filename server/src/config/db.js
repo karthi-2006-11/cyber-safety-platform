@@ -18,6 +18,12 @@ const connectDB = async () => {
     isConnected = true;
     logger.info(`[Database] MongoDB connected successfully to host: ${conn.connection.host}`);
 
+    // Initialize database indexes safely
+    const { initializeDatabaseIndexes } = require('../utilities/initIndexes');
+    initializeDatabaseIndexes().catch(err => {
+      logger.warn('[Database] Index auto-initialization deferred:', err.message);
+    });
+
     mongoose.connection.on('disconnected', () => {
       isConnected = false;
       logger.warn('[Database] MongoDB connection lost.');

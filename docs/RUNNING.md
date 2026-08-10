@@ -1,78 +1,64 @@
-# Cyber Safety Platform — Running & Testing Guide
+# Cyber Safety Platform — Execution & Deployment Guide
 
-## Prerequisites
+## 1. Quick Start (Development Mode)
 
-- **Node.js**: v18.0.0 or higher
-- **MongoDB**: Local MongoDB instance running on `mongodb://127.0.0.1:27017`
+### Prerequisites
+- Node.js v18+
+- npm v9+
+- MongoDB (local or MongoDB Atlas M0 string)
 
----
-
-## 1. Running Backend Server
-
+### Local Development Setup
 ```bash
+# 1. Install server dependencies
 cd server
 npm install
-npm start
-```
-- Server starts on `http://localhost:5000`.
-- Health Check available at: `http://localhost:5000/api/v1/health`
-- Auth Registration: `POST http://localhost:5000/api/v1/auth/register`
-- Auth Login: `POST http://localhost:5000/api/v1/auth/login`
-- Threat Check available at: `http://localhost:5000/api/v1/threats/check?domain=example.com`
-- Pre-sync High Confidence endpoint: `http://localhost:5000/api/v1/threats/high-confidence`
 
----
+# 2. Start backend API daemon (Port 5000)
+npm run dev
 
-## 2. Running User Dashboard Client
-
-```bash
-cd client
+# 3. Install client dependencies (in new terminal)
+cd ../client
 npm install
+
+# 4. Start frontend React dashboard (Port 3000)
 npm run dev
 ```
-- Dashboard opens at `http://localhost:3000`.
 
 ---
 
-## 3. Running Automated Test Suite
+## 2. Production Build & Execution
 
+### Backend API Production Server
+```bash
+cd server
+NODE_ENV=production PORT=5000 JWT_SECRET=your_super_strong_secret_12345 MONGODB_URI=mongodb+srv://... node src/index.js
+```
+
+### Frontend React Production Build
+```bash
+cd client
+VITE_API_BASE_URL=https://api.cybersafety.org npm run build
+```
+Static assets will be output to `client/dist/`.
+
+---
+
+## 3. Browser Extension Production Configuration
+
+1. Open `extension/config.js`.
+2. Set `ENVIRONMENT: 'production'` to point the extension to `https://api.cybersafety.org`.
+3. To package the extension for local developer mode or enterprise distribution:
+```bash
+# Zip extension directory
+zip -r cyber-safety-extension.zip extension/ -x "*.git*"
+```
+4. Load into Chrome via `chrome://extensions` -> "Load unpacked" -> Select `extension/` directory.
+
+---
+
+## 4. Automated Testing
 ```bash
 cd server
 npm test
 ```
-Executes all 87 automated unit & security tests across 8 test files:
-- `tests/pipeline.test.js`
-- `tests/webRisk.test.js`
-- `tests/wikipedia.test.js`
-- `tests/reddit.test.js`
-- `tests/combinedEvidence.test.js`
-- `tests/extensionIntegration.test.js`
-- `tests/communityIntelligence.test.js`
-- `tests/authAndSecurity.test.js`
-
----
-
-## 4. Manual Verification Procedure
-
-### A. Authentication & Registration
-1. Open User Dashboard (`http://localhost:3000`).
-2. Click **Sign In / Register** in header.
-3. Register a normal user account `user@local` with role `USER`.
-4. Register a moderator account `mod@local` with role `MODERATOR`.
-
-### B. Report Submission & Ownership Isolation
-1. Authenticate as `user@local`.
-2. Navigate to **Community Reports** tab and submit report for `test-domain.com`.
-3. View **My Submitted Reports** table. Verify only `user@local` reports are shown.
-
-### C. RBAC Authorization & Header Spoofing Protection
-1. Send request to `POST /api/v1/moderation/reports/:id/action` as `USER` or with spoofed `x-user-role: MODERATOR` without token.
-2. Verify server returns `401 Unauthorized` or `403 Forbidden`.
-
-### D. Moderator Actioning & Extension Sync
-1. Authenticate as `mod@local` (role `MODERATOR`).
-2. Navigate to **Moderator Portal** tab.
-3. Click **Action & Promote Threat** on pending report.
-4. Verify domain is promoted to `HIGH_CONFIDENCE_THREAT`.
-5. Verify `GET /api/v1/threats/high-confidence` returns domain.
-6. Extension pre-syncs domain and installs dynamic DNR blocking rule.
+Executes all 115+ automated test cases covering risk engine, security, JWT RBAC, DNR blocking, and production audit checks.
