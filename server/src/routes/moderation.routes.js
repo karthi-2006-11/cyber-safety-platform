@@ -1,16 +1,17 @@
 const express = require('express');
 const {
-  requireModeratorRole,
   listReports,
   verifyReport,
   actionReport,
   rejectReport
 } = require('../controllers/moderation.controller');
+const { requireAuth, requireRole } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-// Apply RBAC middleware to all moderation endpoints
-router.use(requireModeratorRole);
+// Apply JWT Authentication and Server Role Authorization (MODERATOR or ADMIN)
+router.use(requireAuth);
+router.use(requireRole('MODERATOR', 'ADMIN'));
 
 // GET /api/v1/moderation/reports
 router.get('/moderation/reports', listReports);

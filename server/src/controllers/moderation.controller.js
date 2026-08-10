@@ -6,21 +6,6 @@ const { REPORT_STATUS, THREAT_LEVELS, VERIFICATION_STATUS } = require('../../../
 const { sanitizeText } = require('../services/report.service');
 
 /**
- * Middleware: Verify moderator or admin authorization.
- */
-function requireModeratorRole(req, res, next) {
-  const role = req.headers['x-user-role'] || (req.user && req.user.role);
-  if (!role || (role !== 'MODERATOR' && role !== 'ADMIN')) {
-    return res.status(403).json({
-      success: false,
-      error: 'MODERATOR_AUTHORIZATION_REQUIRED',
-      message: 'Access denied. Moderator authorization required.'
-    });
-  }
-  next();
-}
-
-/**
  * GET /api/v1/moderation/reports
  * Lists all pending, verified, actioned, or rejected community reports.
  */
@@ -70,7 +55,7 @@ async function listReports(req, res, next) {
 
 /**
  * POST /api/v1/moderation/reports/:id/verify
- * Marks a pending report as VERIFIED.
+ * Marks a pending report as VERIFIED with authenticated moderator audit.
  */
 async function verifyReport(req, res, next) {
   try {
@@ -84,7 +69,7 @@ async function verifyReport(req, res, next) {
 
     report.status = REPORT_STATUS.VERIFIED;
     report.moderationMetadata = {
-      moderatedBy: req.headers['x-user-id'] || 'moderator_admin',
+      moderatedBy: req.user ? req.user.email : 'system_moderator',
       moderatedAt: new Date(),
       moderationNotes: notes
     };
@@ -107,7 +92,7 @@ async function verifyReport(req, res, next) {
 
 /**
  * POST /api/v1/moderation/reports/:id/action
- * Marks report as ACTIONED and promotes the domain to HIGH_CONFIDENCE_THREAT.
+ * Marks report as ACTIONED, promotes domain to HIGH_CONFIDENCE_THREAT with authenticated moderator audit.
  */
 async function actionReport(req, res, next) {
   try {
@@ -122,19 +107,17 @@ async function actionReport(req, res, next) {
     report.status = REPORT_STATUS.ACTIONED;
     report.confidenceContribution = 0.90;
     report.moderationMetadata = {
-      moderatedBy: req.headers['x-user-id'] || 'moderator_admin',
+      moderatedBy: req.user ? req.user.email : 'system_moderator',
       moderatedAt: new Date(),
       moderationNotes: notes
     };
     await report.save();
 
-    // Update Evidence records
     await Evidence.updateMany(
       { reportId: report._id },
       { verificationStatus: VERIFICATION_STATUS.VERIFIED, isVerified: true }
     );
 
-    // Promote Website status to HIGH_CONFIDENCE_THREAT
     let website = await Website.findOne({ domain: report.domain });
     if (!website) {
       website = await Website.create({
@@ -148,7 +131,6 @@ async function actionReport(req, res, next) {
       await website.save();
     }
 
-    // Attach or update ThreatInfo record
     await ThreatInfo.create({
       websiteId: website._id,
       category: report.category,
@@ -169,7 +151,7 @@ async function actionReport(req, res, next) {
 
 /**
  * POST /api/v1/moderation/reports/:id/reject
- * Marks report as REJECTED (assigned 0 weight).
+ * Marks report as REJECTED with authenticated moderator audit.
  */
 async function rejectReport(req, res, next) {
   try {
@@ -184,7 +166,7 @@ async function rejectReport(req, res, next) {
     report.status = REPORT_STATUS.REJECTED;
     report.confidenceContribution = 0;
     report.moderationMetadata = {
-      moderatedBy: req.headers['x-user-id'] || 'moderator_admin',
+      moderatedBy: req.user ? req.user.email : 'system_moderator',
       moderatedAt: new Date(),
       moderationNotes: notes
     };
@@ -206,7 +188,6 @@ async function rejectReport(req, res, next) {
 }
 
 module.exports = {
-  requireModeratorRole,
   listReports,
   verifyReport,
   actionReport,

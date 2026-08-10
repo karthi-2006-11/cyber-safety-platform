@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 export default function ModeratorDashboard() {
-  const [role, setRole] = useState('MODERATOR'); // Role toggle for testing RBAC
+  const { user, authHeaders, login, register } = useAuth();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState(null);
@@ -11,13 +12,16 @@ export default function ModeratorDashboard() {
     setActionMessage(null);
     try {
       const res = await fetch('/api/v1/moderation/reports', {
-        headers: { 'x-user-role': role }
+        headers: { ...authHeaders() }
       });
 
       const data = await res.json();
-      if (res.status === 403) {
+      if (res.status === 401 || res.status === 403) {
         setReports([]);
-        setActionMessage({ type: 'error', text: '403 Forbidden: Moderator authorization required.' });
+        setActionMessage({
+          type: 'error',
+          text: `HTTP ${res.status} ${data.error}: ${data.message || 'Moderator authorization required.'}`
+        });
         return;
       }
 
@@ -35,7 +39,7 @@ export default function ModeratorDashboard() {
 
   useEffect(() => {
     fetchModerationReports();
-  }, [role]);
+  }, [user]);
 
   const handleAction = async (reportId, actionType) => {
     setActionMessage(null);
@@ -44,7 +48,7 @@ export default function ModeratorDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-role': role
+          ...authHeaders()
         },
         body: JSON.stringify({ notes: `Actioned via Moderator Portal (${actionType})` })
       });
@@ -65,6 +69,22 @@ export default function ModeratorDashboard() {
     }
   };
 
+  // Quick Account Switcher Helper for Testing JWT Auth Roles
+  const handleQuickLogin = async (targetRole) => {
+    try {
+      const email = targetRole === 'MODERATOR' ? 'mod@cybersafety.local' : 'user@cybersafety.local';
+      const pass = 'Password123!';
+      try {
+        await login(email, pass);
+      } catch (e) {
+        // If account doesn't exist yet, register it
+        await register(email, pass, `${targetRole} Account`, targetRole);
+      }
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err.message });
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <div className="card">
@@ -74,18 +94,34 @@ export default function ModeratorDashboard() {
             <span>🛡️</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Role Context:</span>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Auth Account:</span>
+            <span style={{ fontSize: '11px', fontWeight: '700', color: user?.role === 'MODERATOR' ? '#10b981' : '#ef4444' }}>
+              {user ? `${user.email} (${user.role})` : 'UNAUTHENTICATED'}
+            </span>
+          </div>
+        </div>
+
+        <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '10px 14px', borderRadius: '6px', margin: '14px 0', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Test Account Quick Authentication Switcher:</span>
+          <div style={{ display: 'flex', gap: '8px' }}>
             <button
-              className={`btn ${role === 'MODERATOR' ? 'btn-primary' : 'btn-secondary'}`}
+              className="btn btn-secondary"
               style={{ fontSize: '11px', padding: '4px 10px' }}
-              onClick={() => setRole(role === 'MODERATOR' ? 'USER' : 'MODERATOR')}
+              onClick={() => handleQuickLogin('USER')}
             >
-              {role === 'MODERATOR' ? '🔑 MODERATOR' : '👤 NORMAL USER'}
+              Auth as Normal User
+            </button>
+            <button
+              className="btn btn-primary"
+              style={{ fontSize: '11px', padding: '4px 10px' }}
+              onClick={() => handleQuickLogin('MODERATOR')}
+            >
+              Auth as Moderator
             </button>
           </div>
         </div>
 
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '12px 0 16px 0' }}>
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
           Review pending community reports, inspect evidence, and action confirmed cyber threats for automatic browser blocking synchronization.
         </p>
 
@@ -107,7 +143,9 @@ export default function ModeratorDashboard() {
           <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Loading moderation queue...</p>
         ) : reports.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-dim)', fontSize: '13px' }}>
-            {role === 'MODERATOR' ? 'No reports in moderation queue.' : 'Access restricted. Switch to MODERATOR role context.'}
+            {user && (user.role === 'MODERATOR' || user.role === 'ADMIN')
+              ? 'No reports in moderation queue.'
+              : 'Access restricted. Please authenticate as a MODERATOR account.'}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>

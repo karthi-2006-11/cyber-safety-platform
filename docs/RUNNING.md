@@ -16,6 +16,8 @@ npm start
 ```
 - Server starts on `http://localhost:5000`.
 - Health Check available at: `http://localhost:5000/api/v1/health`
+- Auth Registration: `POST http://localhost:5000/api/v1/auth/register`
+- Auth Login: `POST http://localhost:5000/api/v1/auth/login`
 - Threat Check available at: `http://localhost:5000/api/v1/threats/check?domain=example.com`
 - Pre-sync High Confidence endpoint: `http://localhost:5000/api/v1/threats/high-confidence`
 
@@ -38,39 +40,39 @@ npm run dev
 cd server
 npm test
 ```
-Executes all 55 automated unit & integration tests across 6 test files:
+Executes all 87 automated unit & security tests across 8 test files:
 - `tests/pipeline.test.js`
 - `tests/webRisk.test.js`
 - `tests/wikipedia.test.js`
 - `tests/reddit.test.js`
 - `tests/combinedEvidence.test.js`
 - `tests/extensionIntegration.test.js`
+- `tests/communityIntelligence.test.js`
+- `tests/authAndSecurity.test.js`
 
 ---
 
-## 4. Loading & Testing Browser Extension (Manifest V3)
+## 4. Manual Verification Procedure
 
-1. Open Google Chrome or Chromium browser.
-2. Navigate to `chrome://extensions/`.
-3. Enable **Developer mode** toggle in top-right corner.
-4. Click **Load unpacked** button.
-5. Select the `extension/` folder in this workspace repository.
+### A. Authentication & Registration
+1. Open User Dashboard (`http://localhost:3000`).
+2. Click **Sign In / Register** in header.
+3. Register a normal user account `user@local` with role `USER`.
+4. Register a moderator account `mod@local` with role `MODERATOR`.
 
-### Safe Manual Verification Procedure
+### B. Report Submission & Ownership Isolation
+1. Authenticate as `user@local`.
+2. Navigate to **Community Reports** tab and submit report for `test-domain.com`.
+3. View **My Submitted Reports** table. Verify only `user@local` reports are shown.
 
-Do NOT use real malicious websites as test targets.
+### C. RBAC Authorization & Header Spoofing Protection
+1. Send request to `POST /api/v1/moderation/reports/:id/action` as `USER` or with spoofed `x-user-role: MODERATOR` without token.
+2. Verify server returns `401 Unauthorized` or `403 Forbidden`.
 
-#### Test A: High Confidence Threat Blocking
-1. Seed database with controlled fixture domain: `test-malicious-fixture.com` (status `HIGH_CONFIDENCE_THREAT`).
-2. Navigate to `http://test-malicious-fixture.com`.
-3. Extension receives decision, installs dynamic DNR rule, and redirects tab to `chrome-extension://<id>/blocked.html?domain=test-malicious-fixture.com`.
-4. Block page displays: 🚫 WEBSITE BLOCKED, classification, reasons, and evidence.
-
-#### Test B: Suspicious Domain Warning
-1. Seed database with controlled fixture domain: `test-suspicious-fixture.com` (status `SUSPICIOUS`).
-2. Navigate to `http://test-suspicious-fixture.com`.
-3. Extension receives decision, updates badge to `WARN`, and renders warning banner overlay at top of screen (`⚠️ POTENTIALLY DANGEROUS WEBSITE`).
-
-#### Test C: Safe / Unknown Domain Access
-1. Navigate to `http://example.com` or `http://test-safe-fixture.com`.
-2. Extension allows normal browsing without blocking.
+### D. Moderator Actioning & Extension Sync
+1. Authenticate as `mod@local` (role `MODERATOR`).
+2. Navigate to **Moderator Portal** tab.
+3. Click **Action & Promote Threat** on pending report.
+4. Verify domain is promoted to `HIGH_CONFIDENCE_THREAT`.
+5. Verify `GET /api/v1/threats/high-confidence` returns domain.
+6. Extension pre-syncs domain and installs dynamic DNR blocking rule.

@@ -6,6 +6,7 @@ const healthRoutes = require('./routes/health.routes');
 const threatRoutes = require('./routes/threat.routes');
 const reportRoutes = require('./routes/report.routes');
 const moderationRoutes = require('./routes/moderation.routes');
+const authRoutes = require('./routes/auth.routes');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -18,6 +19,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // API Route Mount Points
 app.use('/api/v1', healthRoutes);
+app.use('/api/v1', authRoutes);
 app.use('/api/v1', threatRoutes);
 app.use('/api/v1', reportRoutes);
 app.use('/api/v1', moderationRoutes);

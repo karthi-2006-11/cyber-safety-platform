@@ -214,19 +214,21 @@ test('K. Web Risk Match + Community Intelligence Combination', () => {
 });
 
 test('L. Moderator RBAC Authorization Check (Rejects Normal User)', () => {
+  const { requireRole } = require('../src/middleware/authMiddleware');
   let statusCode = 0;
   let responseData = null;
 
-  const req = { headers: { 'x-user-role': 'USER' } };
+  const req = { user: { id: '123', email: 'user@local', role: 'USER' } };
   const res = {
     status: (code) => { statusCode = code; return res; },
     json: (data) => { responseData = data; return res; }
   };
 
-  requireModeratorRole(req, res, () => {});
+  const middleware = requireRole('MODERATOR', 'ADMIN');
+  middleware(req, res, () => {});
 
   assert.equal(statusCode, 403);
-  assert.equal(responseData.error, 'MODERATOR_AUTHORIZATION_REQUIRED');
+  assert.equal(responseData.error, 'FORBIDDEN');
 });
 
 test('M. XSS Description Payload Sanitization', () => {

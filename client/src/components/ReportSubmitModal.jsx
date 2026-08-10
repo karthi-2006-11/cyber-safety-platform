@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 export default function ReportSubmitModal() {
+  const { authHeaders, user } = useAuth();
   const [domain, setDomain] = useState('');
   const [category, setCategory] = useState('PHISHING');
   const [description, setDescription] = useState('');
@@ -14,7 +16,9 @@ export default function ReportSubmitModal() {
   const fetchMyReports = async () => {
     setLoadingReports(true);
     try {
-      const res = await fetch('/api/v1/reports/my-reports');
+      const res = await fetch('/api/v1/reports/my-reports', {
+        headers: { ...authHeaders() }
+      });
       if (res.ok) {
         const json = await res.json();
         if (json.success) setMyReports(json.reports || []);
@@ -28,7 +32,7 @@ export default function ReportSubmitModal() {
 
   useEffect(() => {
     fetchMyReports();
-  }, []);
+  }, [user]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,7 +54,10 @@ export default function ReportSubmitModal() {
     try {
       const res = await fetch('/api/v1/reports', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders()
+        },
         body: JSON.stringify({
           domain: domain.trim(),
           category,

@@ -5,14 +5,45 @@
 The Cyber Safety Platform is a real-time background protection system designed with a core security mission:
 > *"Build something that has the ability to stop a cybercrime before the user becomes a victim."*
 
-The platform consists of three primary decoupled components:
+The platform consists of four primary decoupled components:
 1. **Browser Extension (`extension/`)**: Chromium Manifest V3 background service worker listening to navigation, querying backend threat API, managing dynamic `declarativeNetRequest` rules, rendering warning banners, and serving an isolated extension block page (`blocked.html`).
-2. **Backend API (`server/`)**: Express.js REST application managing website threat records, user safety reports, evidence persistence, Google Web Risk lookups, Wikipedia/Reddit public context lookups, and classification lookups via MongoDB.
-3. **User Dashboard (`client/`)**: Modern React interface allowing users to inspect domain threat decisions, submit safety feedback with supporting proof, and view system status.
+2. **Threat Analysis Engine (`server/src/pipeline/`)**: Decoupled 6-stage evaluation pipeline combining URL normalization, local reputation records, Google Web Risk API threat intelligence, community user reports, Wikipedia/Reddit public evidence, and explainable risk calculation.
+3. **Community Intelligence & Moderation (`server/src/services/report.service.js`)**: Anonymized reporter tracking (`independentReporterCount`), multi-evidence attachment, duplicate report filtering, and JWT RBAC-protected moderator workflow.
+4. **Production Security & Auth System (`server/src/middleware/authMiddleware.js`)**: Server-side JWT authentication, `bcrypt` password hashing, role-based access control (`USER`, `MODERATOR`, `ADMIN`), rate limiting, and report ownership isolation.
+5. **User & Moderator Dashboard (`client/`)**: Modern React 18 + Vite interface with dark glassmorphism UI for inspecting threats, submitting community reports, managing user authentication, and actioning pending threats.
 
 ---
 
-## 6-Stage Threat Analysis Pipeline & Browser Protection Architecture
+## Production Security & Authentication Architecture (Phase 7)
+
+```
+Client Request
+      ↓
+  [ Bearer JWT Token in Authorization Header ]
+      ↓
+  [ authMiddleware.requireAuth ] ──(If missing/invalid)──► HTTP 401 Unauthorized
+      ↓
+  [ Decodes & Verifies JWT Signature (JWT_SECRET) ]
+      ↓
+  [ Validates User Account in MongoDB (isActive !== false) ]
+      ↓
+  [ Attaches Trusted User Identity: req.user = { id, email, role } ]
+      ↓ (Strips any client-spoofed x-user-role headers)
+  [ authMiddleware.requireRole('MODERATOR', 'ADMIN') ] ──(If req.user.role !== MODERATOR)──► HTTP 403 Forbidden
+      ↓
+  [ Execute Protected Controller Action with Moderator Audit Trail ]
+```
+
+### Security Safeguards
+- **Removal of Header Vulnerability**: Client-supplied `x-user-role` headers are explicitly deleted and ignored by server middleware. Authorization is strictly bound to server-verified JWT claims and user database records.
+- **Password Hashing**: Passwords are hashed with `bcrypt` (cost factor 10). Password hashes are specified with `select: false` in Mongoose models and JSON output transforms, ensuring hashes are never exposed in API responses or logs.
+- **Generic Auth Errors**: Login failures return generic `401 Invalid email or password` errors to prevent email enumeration.
+- **Report Ownership Isolation**: `GET /api/v1/reports/my-reports` derives user identity strictly from `req.user.id`. Client query overrides (`?userId=...`) are ignored.
+- **Public Extension Endpoint**: `GET /api/v1/threats/high-confidence` remains a public read-only endpoint returning non-sensitive domain strings for extension DNR dynamic rule synchronization without embedding secret keys in extension code.
+
+---
+
+## 6-Stage Threat Analysis Pipeline
 
 ```
 Requested URL / Domain Input
@@ -36,65 +67,4 @@ Requested URL / Domain Input
        ├── HIGH_CONFIDENCE_THREAT → Dynamic DNR Rule Installed + Tab Redirected to blocked.html
        ├── SUSPICIOUS → Warning Banner Overlay Rendered via Content Script
        └── SAFE / UNKNOWN → Normal Access Allowed
-```
-
----
-
-## Browser Protection & Dynamic Rule Architecture (Manifest V3)
-
-### Manifest V3 Technical Reality & Navigation Enforcement
-- **Pre-blocked Known Threats**: Domains previously classified as `HIGH_CONFIDENCE_THREAT` are installed as dynamic blocking/redirect rules using `chrome.declarativeNetRequest` (DNR). Chromium intercepts and redirects matching requests to `extension/blocked.html` **before** network navigation occurs.
-- **First-Time Unindexed Domains**: When navigating to a new unindexed domain, Chromium MV3 does NOT allow blocking an ongoing HTTP request synchronously while awaiting a remote backend API response. The extension listens via `chrome.webNavigation`, queries `/api/v1/threats/check`, and if `HIGH_CONFIDENCE_THREAT` is returned:
-  1) Installs a permanent DNR blocking rule for future visits.
-  2) Immediately redirects the active tab to `extension/blocked.html?domain=...`.
-- **Zero Fake Promises**: The architecture explicitly documents this technical reality rather than claiming impossible synchronous pre-navigation blocking for unindexed domains.
-
-### Dynamic DNR Rule System (`extension/ruleManager.js`)
-- Uses `chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [...], addRules: [...] })`.
-- Scoped strictly to target domain (`urlFilter: "||domain^"`).
-- Uses deterministic rule IDs generated via domain string hashing.
-- Stores decision metadata & evidence in `chrome.storage.local` under `blockedDomainsMap`.
-
-### Extension Block Page (`extension/blocked.html`)
-- Hosted locally inside extension package (`chrome-extension://<id>/blocked.html?domain=...`).
-- Never loads the dangerous website content.
-- Displays:
-  - Header: 🚫 WEBSITE BLOCKED - "This website was blocked because our protection system identified it as a high-confidence cyber threat."
-  - Blocked domain name, classification (`HIGH_CONFIDENCE_THREAT`), risk level (`HIGH`), confidence score.
-  - Explainable detection reasons.
-  - Supporting evidence items with verification badges (`SYSTEM DETECTION`, `VERIFIED`, `SUPPORTED`, `UNVERIFIED COMMUNITY REPORT`).
-- Renders DOM using safe `textContent` / element creation (zero `innerHTML` XSS risk).
-
-### Suspicious Warning Overlay (`extension/content.js`)
-- When classification is `SUSPICIOUS`, extension sends a message to `content.js` to render a non-intrusive warning banner overlay at top of screen: `⚠️ POTENTIALLY DANGEROUS WEBSITE`.
-
-### Extension Permissions (`extension/manifest.json`)
-- `declarativeNetRequest`: Dynamic rule creation for high-confidence domain redirects.
-- `webNavigation`: Navigation event listener for background domain inspection.
-- `storage`: Local persistence of blocked domains map and active domain state.
-- `tabs` & `activeTab`: Tab URL inspection and badge updates.
-- Host permissions: `http://localhost/*`, `http://127.0.0.1/*`, `https://*/*`.
-
----
-
-## Component Separation
-
-```
-project-root/
-├── client/           # User dashboard (React 18 + Vite)
-├── server/           # Backend REST API (Node.js + Express + Mongoose)
-│   ├── src/pipeline/ # 6-stage Threat Pipeline (Normalizer, Local, WebRisk, Community, Wiki, Reddit, Calculator)
-│   ├── src/services/ # WebRisk, Wikipedia, and Reddit Services
-│   └── tests/        # Automated test suite (55 tests across 6 test files)
-├── extension/        # Chromium Manifest V3 browser protection extension
-│   ├── background.js # Background service worker & navigation listener
-│   ├── ruleManager.js# Dynamic declarativeNetRequest rule manager
-│   ├── blocked.html  # Isolated extension block page HTML
-│   ├── blocked.css   # Block page styling
-│   ├── blocked.js    # Block page script & evidence renderer
-│   ├── content.js    # Suspicious domain warning banner overlay
-│   ├── popup.html    # Protection status popup HTML
-│   └── popup.js      # Popup status & rule count logic
-├── shared/           # Shared status enums, risk levels, and constants
-└── docs/             # Technical architecture & project documentation
 ```
