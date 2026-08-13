@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
 
 export default function ReportSubmitModal() {
   const { authHeaders, user } = useAuth();
@@ -16,7 +17,7 @@ export default function ReportSubmitModal() {
   const fetchMyReports = async () => {
     setLoadingReports(true);
     try {
-      const res = await fetch('/api/v1/reports/my-reports', {
+      const res = await fetch(`${API_BASE_URL}/reports/my-reports`, {
         headers: { ...authHeaders() }
       });
       if (res.ok) {
@@ -52,7 +53,7 @@ export default function ReportSubmitModal() {
     }
 
     try {
-      const res = await fetch('/api/v1/reports', {
+      const res = await fetch(`${API_BASE_URL}/reports`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import EvidenceSection from './EvidenceSection';
+import { API_BASE_URL } from '../config/api';
 
 export default function DomainCheckSection() {
   const [domainInput, setDomainInput] = useState('');
@@ -16,7 +17,7 @@ export default function DomainCheckSection() {
     setResult(null);
 
     try {
-      const res = await fetch(`/api/v1/threats/check?domain=${encodeURIComponent(domainInput.trim())}`);
+      const res = await fetch(`${API_BASE_URL}/threats/check?domain=${encodeURIComponent(domainInput.trim())}`);
       const data = await res.json();
 
       if (!res.ok || !data.success) {

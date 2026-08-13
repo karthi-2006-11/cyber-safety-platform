@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { API_BASE_URL } from '../config/api';
 
 export default function ModeratorDashboard() {
   const { user, authHeaders, login, register } = useAuth();
@@ -11,7 +12,7 @@ export default function ModeratorDashboard() {
     setLoading(true);
     setActionMessage(null);
     try {
-      const res = await fetch('/api/v1/moderation/reports', {
+      const res = await fetch(`${API_BASE_URL}/moderation/reports`, {
         headers: { ...authHeaders() }
       });
 
@@ -44,7 +45,7 @@ export default function ModeratorDashboard() {
   const handleAction = async (reportId, actionType) => {
     setActionMessage(null);
     try {
-      const res = await fetch(`/api/v1/moderation/reports/${reportId}/${actionType}`, {
+      const res = await fetch(`${API_BASE_URL}/moderation/reports/${reportId}/${actionType}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

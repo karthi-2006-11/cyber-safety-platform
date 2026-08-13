@@ -25,8 +25,17 @@ app.use(helmet({
 }));
 
 // 3. Strict CORS origin handling
+const configuredCorsOrigin = env.corsOrigin || '*';
 app.use(cors({
-  origin: env.corsOrigin === '*' ? '*' : env.corsOrigin,
+  origin: (origin, callback) => {
+    if (!origin || configuredCorsOrigin === '*') return callback(null, true);
+    const allowedList = configuredCorsOrigin.split(',').map(o => o.trim().replace(/\/+$/, '')).filter(Boolean);
+    const cleanOrigin = origin.trim().replace(/\/+$/, '');
+    if (allowedList.includes(cleanOrigin) || allowedList.includes('*')) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
   exposedHeaders: ['X-Request-ID']

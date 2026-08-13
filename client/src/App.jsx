@@ -8,6 +8,8 @@ import ReportSubmitModal from './components/ReportSubmitModal';
 import ModeratorDashboard from './components/ModeratorDashboard';
 import DecisionsTable from './components/DecisionsTable';
 
+import { API_BASE_URL } from './config/api';
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [backendOnline, setBackendOnline] = useState(false);
@@ -15,7 +17,7 @@ export default function App() {
   useEffect(() => {
     const checkBackend = async () => {
       try {
-        const res = await fetch('/api/v1/health');
+        const res = await fetch(`${API_BASE_URL}/health`);
         if (res.ok) {
           setBackendOnline(true);
         } else {
