@@ -97,8 +97,11 @@ function calculateRisk(
   let confidence = 0.50;
 
   // 1. Check Official Website DB record override
-  if (reputationData.found && reputationData.websiteRecord) {
-    const dbStatus = reputationData.websiteRecord.currentStatus;
+  const dbStatus = (reputationData.found && reputationData.websiteRecord)
+    ? reputationData.websiteRecord.currentStatus
+    : null;
+
+  if (dbStatus && dbStatus !== THREAT_LEVELS.UNKNOWN) {
     if (dbStatus === THREAT_LEVELS.HIGH_CONFIDENCE_THREAT) {
       classification = THREAT_LEVELS.HIGH_CONFIDENCE_THREAT;
       riskLevel = RISK_LEVELS.HIGH;
