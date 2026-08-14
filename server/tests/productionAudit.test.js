@@ -26,13 +26,18 @@ test('2. Manifest V3 Audit — Minimum Necessary Permission Bounds', () => {
 
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.name, 'Cyber Safety Protection Engine');
-  assert.ok(manifest.permissions.includes('declarativeNetRequest'));
+  assert.ok(manifest.permissions.includes('activeTab'));
+  assert.ok(manifest.permissions.includes('tabs'));
   assert.ok(manifest.permissions.includes('storage'));
   assert.ok(manifest.permissions.includes('webNavigation'));
   
-  // Verify no excessive permissions
+  // Verify zero excessive permissions
   assert.equal(manifest.permissions.includes('debugger'), false);
   assert.equal(manifest.permissions.includes('management'), false);
+  assert.equal(manifest.permissions.includes('history'), false);
+  assert.equal(manifest.permissions.includes('cookies'), false);
+  assert.equal(manifest.permissions.includes('webRequest'), false);
+  assert.equal(manifest.permissions.includes('declarativeNetRequest'), false);
 });
 
 test('3. Extension Security Audit — Zero API Secrets Stored in Extension Bundle', () => {
@@ -121,3 +126,17 @@ test('7. Web Risk API Key Audit — Zero Web Risk API Key Secrets in Client or D
   assertNoSecrets(clientDistDir);
 });
 
+test('8. Extension Protection Policy Audit — Fail-Safe Non-Blocking Bounds', () => {
+  const backgroundPath = path.join(__dirname, '../../extension/background.js');
+  const backgroundContent = fs.readFileSync(backgroundPath, 'utf8');
+
+  // Verify only HIGH_CONFIDENCE_THREAT triggers protection update
+  assert.ok(backgroundContent.includes("status === 'HIGH_CONFIDENCE_THREAT'"));
+  assert.ok(backgroundContent.includes("blocked.html?domain="));
+
+  // Verify fail-safe statuses non-blocking comments/cases
+  assert.ok(backgroundContent.includes("case 'SAFE':"));
+  assert.ok(backgroundContent.includes("case 'SUSPICIOUS':"));
+  assert.ok(backgroundContent.includes("case 'OFFLINE':"));
+  assert.ok(backgroundContent.includes("case 'UNKNOWN':"));
+});

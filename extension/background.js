@@ -1,6 +1,6 @@
 /**
  * Cyber Safety Platform - Extension Background Service Worker
- * Phase 12A: Real-Time URL Detection Engine (Detection Only)
+ * Phase 12B: Real-Time Threat Warning & Protection Engine
  * 
  * Target Backend: https://cyber-safety-platform-50px.onrender.com/api/v1
  * Threat Lookup Endpoint: GET /api/v1/threats/check?domain=<normalized-domain>
@@ -87,6 +87,11 @@ function extractCanonicalDomain(urlString) {
 async function inspectTabUrl(tabId, urlString) {
   if (!tabId) return;
 
+  // Prevent inspecting extension's own warning page to avoid infinite loops
+  if (urlString && urlString.includes('blocked.html')) {
+    return;
+  }
+
   // Increment version sequence for this tab to guard against stale async races
   const currentVersion = (tabRequestVersions.get(tabId) || 0) + 1;
   tabRequestVersions.set(tabId, currentVersion);
@@ -110,7 +115,7 @@ async function inspectTabUrl(tabId, urlString) {
   const cached = domainCache.get(domain);
   if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
     if (tabRequestVersions.get(tabId) === currentVersion) {
-      await applyInspectionResult(tabId, domain, cached.result);
+      await applyInspectionResult(tabId, domain, cached.result, urlString);
     }
     return;
   }
@@ -127,7 +132,7 @@ async function inspectTabUrl(tabId, urlString) {
 
     // Verify tab is still on the same request version before applying result
     if (tabRequestVersions.get(tabId) === currentVersion) {
-      await applyInspectionResult(tabId, domain, decision);
+      await applyInspectionResult(tabId, domain, decision, urlString);
     }
 
   } catch (err) {
@@ -140,24 +145,25 @@ async function inspectTabUrl(tabId, urlString) {
       reasons: ['Cyber Safety backend is currently unreachable.']
     };
     if (tabRequestVersions.get(tabId) === currentVersion) {
-      await applyInspectionResult(tabId, domain, errorDecision);
+      await applyInspectionResult(tabId, domain, errorDecision, urlString);
     }
   }
 }
 
 /**
- * Updates extension action badge and persists tab inspection state in chrome.storage.local.
- * Safely guards against closed or replaced tabs.
+ * Updates extension action badge, persists tab state in chrome.storage.local,
+ * and triggers defensive warning interstitial ONLY for confirmed HIGH_CONFIDENCE_THREAT.
  */
-async function applyInspectionResult(tabId, domain, decision) {
+async function applyInspectionResult(tabId, domain, decision, originalUrlString = '') {
   if (!tabId) return;
 
-  // Confirm tab still exists before setting storage or updating badge
+  // Confirm tab still exists before setting storage or triggering protection
   const tabExists = await chrome.tabs.get(tabId).then(() => true).catch(() => false);
   if (!tabExists) return;
 
   const status = decision.classification || decision.status || 'UNKNOWN';
 
+  // Store active tab data for popup rendering
   await chrome.storage.local.set({
     activeDomain: domain,
     activeStatus: status,
@@ -165,15 +171,32 @@ async function applyInspectionResult(tabId, domain, decision) {
     lastCheckedAt: new Date().toISOString()
   }).catch(() => {});
 
+  // PHASE 12B DEFENSIVE PROTECTION TRIGGER: Only HIGH_CONFIDENCE_THREAT triggers interstitial warning
+  if (status === 'HIGH_CONFIDENCE_THREAT') {
+    // 1. Store domain decision map for blocked.html warning page reader
+    const storageData = await chrome.storage.local.get(['blockedDomainsMap']).catch(() => ({}));
+    const map = storageData.blockedDomainsMap || {};
+    map[domain] = { timestamp: Date.now(), decision };
+    await chrome.storage.local.set({ blockedDomainsMap: map }).catch(() => {});
+
+    // 2. Redirect tab safely to extension-owned warning interstitial page if not already there
+    const warningPageUrl = chrome.runtime.getURL(`blocked.html?domain=${encodeURIComponent(domain)}`);
+    if (originalUrlString && !originalUrlString.includes('blocked.html')) {
+      await chrome.tabs.update(tabId, { url: warningPageUrl }).catch(() => {});
+    }
+
+    await updateBadge(tabId, 'RISK', '#ef4444');
+    return;
+  }
+
+  // Defensive Policy: All non-HIGH_CONFIDENCE_THREAT statuses allow normal browsing (No blocking)
   switch (status) {
     case 'SAFE':
       await updateBadge(tabId, 'SAFE', '#10b981');
       break;
     case 'SUSPICIOUS':
+      // Show warning badge in popup only; normal browsing continues
       await updateBadge(tabId, 'WARN', '#f59e0b');
-      break;
-    case 'HIGH_CONFIDENCE_THREAT':
-      await updateBadge(tabId, 'RISK', '#ef4444');
       break;
     case 'OFFLINE':
       await updateBadge(tabId, 'OFF', '#6b7280');
@@ -191,14 +214,12 @@ async function applyInspectionResult(tabId, domain, decision) {
 async function updateBadge(tabId, text, color) {
   if (!chrome.action || !tabId) return;
   try {
-    // Verify tab still exists before calling badge APIs
     const tabExists = await chrome.tabs.get(tabId).then(() => true).catch(() => false);
     if (!tabExists) return;
 
     await chrome.action.setBadgeText({ tabId, text });
     await chrome.action.setBadgeBackgroundColor({ tabId, color });
   } catch (err) {
-    // Ignore expected tab lifecycle errors if tab disappeared mid-execution
     if (err.message && err.message.includes('No tab with id')) {
       return;
     }
@@ -206,4 +227,4 @@ async function updateBadge(tabId, text, color) {
   }
 }
 
-console.log('[CyberSafety Extension] Phase 12A Real-Time URL Detection Service Worker Loaded.');
+console.log('[CyberSafety Extension] Phase 12B Real-Time Threat Warning & Protection Engine Initialized.');

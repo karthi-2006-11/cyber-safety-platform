@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Fallback: Query backend threat check if not cached locally
   if (!decision) {
     try {
-      const apiBase = typeof CONFIG !== 'undefined' ? CONFIG.API_BASE_URL : 'http://localhost:5000/api/v1';
+      const apiBase = typeof CONFIG !== 'undefined' ? CONFIG.API_BASE_URL : 'https://cyber-safety-platform-50px.onrender.com/api/v1';
       const res = await fetch(`${apiBase}/threats/check?domain=${encodeURIComponent(domain)}`);
       if (res.ok) {
         const json = await res.json();
@@ -74,9 +74,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const header = document.createElement('div');
         header.className = 'evidence-header';
 
+        let displayTitle = item.title;
+        if (!displayTitle || displayTitle === 'nil') {
+          displayTitle = item.source === 'COMMUNITY_REPORT' ? 'Community Safety Report' : 'Security Intelligence';
+        }
+
         const title = document.createElement('span');
         title.className = 'evidence-title';
-        title.textContent = item.title || item.source;
+        title.textContent = displayTitle;
 
         const statusBadge = document.createElement('span');
         statusBadge.className = `badge ${item.verificationStatus ? item.verificationStatus.toLowerCase() : 'unknown'}`;
@@ -127,7 +132,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   dashboardBtn.addEventListener('click', () => {
-    const dashboardUrl = typeof CONFIG !== 'undefined' ? CONFIG.DASHBOARD_URL : 'http://localhost:3000';
+    const dashboardUrl = typeof CONFIG !== 'undefined' ? CONFIG.DASHBOARD_URL : 'https://cyber-safety-platform-client.onrender.com';
     if (typeof chrome !== 'undefined' && chrome.tabs) {
       chrome.tabs.create({ url: dashboardUrl });
     } else {
