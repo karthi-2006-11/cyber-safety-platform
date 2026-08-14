@@ -96,3 +96,28 @@ test('6. Logger Redaction Audit — Redacts Secrets and Passwords', () => {
   assert.equal(redacted.apiKey, '[REDACTED]');
   assert.equal(redacted.user, 'admin@cybersafety.org');
 });
+
+test('7. Web Risk API Key Audit — Zero Web Risk API Key Secrets in Client or Dist', () => {
+  const clientSrcDir = path.join(__dirname, '../../client/src');
+  const clientDistDir = path.join(__dirname, '../../client/dist');
+
+  function assertNoSecrets(dir) {
+    if (!fs.existsSync(dir)) return;
+    const items = fs.readdirSync(dir);
+    for (const item of items) {
+      const fullPath = path.join(dir, item);
+      const stat = fs.statSync(fullPath);
+      if (stat.isDirectory()) {
+        assertNoSecrets(fullPath);
+      } else if (item.endsWith('.js') || item.endsWith('.jsx') || item.endsWith('.html')) {
+        const content = fs.readFileSync(fullPath, 'utf8');
+        assert.equal(content.includes('VITE_GOOGLE_WEB_RISK_API_KEY'), false, `Forbidden env var found in ${item}`);
+        assert.equal(content.includes('googleWebRiskApiKey'), false, `Secret prop found in ${item}`);
+      }
+    }
+  }
+
+  assertNoSecrets(clientSrcDir);
+  assertNoSecrets(clientDistDir);
+});
+

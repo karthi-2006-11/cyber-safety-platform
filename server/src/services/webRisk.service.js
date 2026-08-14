@@ -89,7 +89,8 @@ async function searchUri(rawUrl, customFetch = null) {
     }
 
     // Log safely without exposing API keys
-    logger.warn('[WebRiskService] Request failed:', err.message);
+    const safeErrorMsg = (err.message || '').replace(/key=[^&]+/g, 'key=[REDACTED]');
+    logger.warn('[WebRiskService] Request failed:', safeErrorMsg);
     return { success: false, reason: 'NETWORK_FAILURE', threatTypes: [] };
   }
 }
