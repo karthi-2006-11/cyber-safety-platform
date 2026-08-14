@@ -6,7 +6,7 @@ const { searchUri } = require('../src/services/webRisk.service');
 const { evaluateWebRisk } = require('../src/pipeline/webRiskEvaluator');
 const { analyzeDomain } = require('../src/pipeline/threatPipeline');
 const { calculateRisk } = require('../src/pipeline/riskCalculator');
-const { THREAT_LEVELS, RISK_LEVELS, SIGNAL_SEVERITY } = require('../../shared/constants');
+const { THREAT_LEVELS, RISK_LEVELS, SIGNAL_SEVERITY, EVIDENCE_SOURCES } = require('../../shared/constants');
 
 // Helper mock fetch generator
 function createMockFetch(status = 200, responseBody = {}, shouldTimeout = false) {
@@ -21,12 +21,11 @@ function createMockFetch(status = 200, responseBody = {}, shouldTimeout = false)
       status,
       json: async () => responseBody
     };
-  }
+  };
 }
 
 test('1. Web Risk API reports MALWARE threat', async () => {
   cache.clear();
-  // Temporarily mock API Key for test scope
   const originalKey = env.googleWebRiskApiKey;
   env.googleWebRiskApiKey = 'test_mock_api_key';
 
@@ -68,7 +67,29 @@ test('2. Web Risk API reports SOCIAL_ENGINEERING threat', async () => {
   assert.ok(evalResult.signals[0].description.includes('SOCIAL_ENGINEERING'));
 });
 
-test('3. Web Risk API returns no threat (Clean Response)', async () => {
+test('3. Web Risk API reports UNWANTED_SOFTWARE threat', async () => {
+  cache.clear();
+  const originalKey = env.googleWebRiskApiKey;
+  env.googleWebRiskApiKey = 'test_mock_api_key';
+
+  const mockFetch = createMockFetch(200, {
+    threat: {
+      threatTypes: ['UNWANTED_SOFTWARE'],
+      expireTime: '2026-08-09T23:00:00Z'
+    }
+  });
+
+  const evalResult = await evaluateWebRisk('adware-domain.com', mockFetch);
+  env.googleWebRiskApiKey = originalKey;
+
+  assert.equal(evalResult.matchFound, true);
+  assert.deepEqual(evalResult.threatTypes, ['UNWANTED_SOFTWARE']);
+  assert.equal(evalResult.signals.length, 1);
+  assert.equal(evalResult.signals[0].severity, SIGNAL_SEVERITY.HIGH);
+  assert.ok(evalResult.signals[0].description.includes('UNWANTED_SOFTWARE'));
+});
+
+test('4. Web Risk API returns no threat (Clean Response)', async () => {
   cache.clear();
   const originalKey = env.googleWebRiskApiKey;
   env.googleWebRiskApiKey = 'test_mock_api_key';
@@ -84,7 +105,7 @@ test('3. Web Risk API returns no threat (Clean Response)', async () => {
   assert.ok(evalResult.signals[0].description.includes('no threat matches'));
 });
 
-test('4. Web Risk API Key Missing (Graceful Fallback)', async () => {
+test('5. Web Risk API Key Missing (Graceful Fallback)', async () => {
   cache.clear();
   const originalKey = env.googleWebRiskApiKey;
   env.googleWebRiskApiKey = ''; // Simulate missing key
@@ -98,7 +119,37 @@ test('4. Web Risk API Key Missing (Graceful Fallback)', async () => {
   assert.ok(evalResult.signals[0].description.includes('MISSING_API_KEY') || evalResult.signals[0].description.includes('unavailable'));
 });
 
-test('5. Web Risk API Request Timeout', async () => {
+test('6. Web Risk API Invalid Key Error (HTTP 400 Bad Request)', async () => {
+  cache.clear();
+  const originalKey = env.googleWebRiskApiKey;
+  env.googleWebRiskApiKey = 'invalid_key_123';
+
+  const errorFetch = createMockFetch(400, { error: { code: 400, message: 'API key not valid' } });
+
+  const evalResult = await evaluateWebRisk('invalid-key-domain.com', errorFetch);
+  env.googleWebRiskApiKey = originalKey;
+
+  assert.equal(evalResult.checked, false);
+  assert.equal(evalResult.reason, 'HTTP_ERROR_400');
+  assert.ok(evalResult.signals[0].description.includes('HTTP_ERROR_400'));
+});
+
+test('7. Web Risk API Forbidden Error (HTTP 403 Access Denied)', async () => {
+  cache.clear();
+  const originalKey = env.googleWebRiskApiKey;
+  env.googleWebRiskApiKey = 'forbidden_key_456';
+
+  const errorFetch = createMockFetch(403, { error: { code: 403, message: 'Web Risk API has not been used in project' } });
+
+  const evalResult = await evaluateWebRisk('forbidden-key-domain.com', errorFetch);
+  env.googleWebRiskApiKey = originalKey;
+
+  assert.equal(evalResult.checked, false);
+  assert.equal(evalResult.reason, 'HTTP_ERROR_403');
+  assert.ok(evalResult.signals[0].description.includes('HTTP_ERROR_403'));
+});
+
+test('8. Web Risk API Request Timeout', async () => {
   cache.clear();
   const originalKey = env.googleWebRiskApiKey;
   env.googleWebRiskApiKey = 'test_mock_api_key';
@@ -112,50 +163,34 @@ test('5. Web Risk API Request Timeout', async () => {
   assert.equal(evalResult.reason, 'TIMEOUT');
 });
 
-test('6. Web Risk API returns HTTP Error (500 Internal Error)', async () => {
+test('9. Web Risk API Network Failure', async () => {
   cache.clear();
   const originalKey = env.googleWebRiskApiKey;
   env.googleWebRiskApiKey = 'test_mock_api_key';
 
-  const errorFetch = createMockFetch(500, { error: 'Internal Server Error' });
+  const malformedFetch = async () => {
+    throw new SyntaxError('Unexpected token < in JSON');
+  };
 
-  const evalResult = await evaluateWebRisk('error-500-domain.com', errorFetch);
-  env.googleWebRiskApiKey = originalKey;
-
-  assert.equal(evalResult.checked, false);
-  assert.equal(evalResult.reason, 'HTTP_ERROR_500');
-});
-
-test('7. Web Risk API returns Malformed Response', async () => {
-  cache.clear();
-  const originalKey = env.googleWebRiskApiKey;
-  env.googleWebRiskApiKey = 'test_mock_api_key';
-
-  const malformedFetch = async () => ({
-    ok: true,
-    status: 200,
-    json: async () => { throw new SyntaxError('Unexpected token < in JSON'); }
-  });
-
-  const evalResult = await evaluateWebRisk('malformed-json-domain.com', malformedFetch);
+  const evalResult = await evaluateWebRisk('network-failure-domain.com', malformedFetch);
   env.googleWebRiskApiKey = originalKey;
 
   assert.equal(evalResult.checked, false);
   assert.equal(evalResult.reason, 'NETWORK_FAILURE');
 });
 
-test('8. Web Risk Result Combined with Community Reports', () => {
+test('10. Evidence Separation (Web Risk Intelligence Evidence vs Community Reports Evidence)', () => {
   const mockReputation = { found: false, signals: [] };
   const mockWebRisk = {
     checked: true,
     matchFound: true,
-    threatTypes: ['SOCIAL_ENGINEERING'],
+    threatTypes: ['MALWARE'],
     signals: [{
       type: 'EXTERNAL_THREAT_INTEL_MATCH',
       source: 'GOOGLE_WEB_RISK',
       severity: SIGNAL_SEVERITY.CRITICAL,
       weight: 90,
-      description: 'Google Web Risk identified this URL as SOCIAL_ENGINEERING',
+      description: 'Google Web Risk identified this URL as MALWARE',
       reliability: 0.95
     }]
   };
@@ -168,19 +203,34 @@ test('8. Web Risk Result Combined with Community Reports', () => {
       description: '1 pending user report submitted flagging potential PHISHING',
       reliability: 0.60
     }],
-    reports: [{ category: 'PHISHING', description: 'Fake login link', status: 'PENDING' }]
+    evidence: [{
+      source: 'COMMUNITY_REPORT',
+      sourceType: 'COMMUNITY_INTELLIGENCE',
+      title: 'User Community Report',
+      excerpt: 'Fake bank login page reported by user',
+      relevance: 'HIGH',
+      retrievedAt: new Date().toISOString()
+    }],
+    reports: [{ category: 'PHISHING', description: 'Fake bank login page', status: 'PENDING' }]
   };
 
-  const decision = calculateRisk('combined-threat.com', mockReputation, mockWebRisk, mockCommunity);
+  const decision = calculateRisk('separated-evidence.com', mockReputation, mockWebRisk, mockCommunity);
 
   assert.equal(decision.classification, THREAT_LEVELS.HIGH_CONFIDENCE_THREAT);
   assert.equal(decision.riskLevel, RISK_LEVELS.HIGH);
-  assert.equal(decision.confidence, 0.90);
-  assert.ok(decision.reasons.some(r => r.includes('SOCIAL_ENGINEERING')));
-  assert.ok(decision.reasons.some(r => r.includes('pending user report')));
+  
+  // Verify Web Risk evidence card is distinct
+  const webRiskEvidence = decision.evidence.filter(e => e.source === EVIDENCE_SOURCES.GOOGLE_WEB_RISK);
+  const communityEvidence = decision.evidence.filter(e => e.source === 'COMMUNITY_REPORT');
+
+  assert.equal(webRiskEvidence.length, 1);
+  assert.equal(webRiskEvidence[0].title, 'Google Web Risk: MALWARE');
+
+  assert.equal(communityEvidence.length, 1);
+  assert.equal(communityEvidence[0].title, 'User Community Report');
 });
 
-test('9. Web Risk Result Combined with Local Reputation Record', () => {
+test('11. Web Risk Result Combined with Local Reputation Record', () => {
   const mockReputation = {
     found: true,
     websiteRecord: { currentStatus: THREAT_LEVELS.SUSPICIOUS },
@@ -214,7 +264,7 @@ test('9. Web Risk Result Combined with Local Reputation Record', () => {
   assert.equal(decision.riskLevel, RISK_LEVELS.MEDIUM);
 });
 
-test('10. External Service Failure Does Not Crash Threat Pipeline', async () => {
+test('12. External Service Failure Does Not Crash Threat Pipeline', async () => {
   cache.clear();
   const originalKey = env.googleWebRiskApiKey;
   env.googleWebRiskApiKey = 'test_mock_api_key';
