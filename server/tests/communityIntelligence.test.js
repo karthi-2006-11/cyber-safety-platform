@@ -266,3 +266,154 @@ test('P. Extension Dynamic DNR Synchronization for Promoted Domain', async () =>
   await syncBlockRules(list);
   assert.equal(globalThis.mockDnrRules.length, 2);
 });
+
+test('Q. TEST 1 & 2 & 3: Verified Community Report produces signal and USER_REPORT_DATABASE evidence card', () => {
+  const mockReputation = { found: false, signals: [] };
+  const mockWebRisk = { checked: true, matchFound: false, signals: [] };
+  const mockCommunity = {
+    reportsCount: 1,
+    verifiedReportCount: 1,
+    signals: [{
+      type: 'VERIFIED_COMMUNITY_REPORTS',
+      source: 'USER_REPORT_DATABASE',
+      severity: SIGNAL_SEVERITY.HIGH,
+      weight: 70,
+      description: '1 community report verified by security analyst'
+    }],
+    evidence: [{
+      source: 'COMMUNITY_REPORT',
+      sourceType: 'USER_REPORT',
+      title: 'Community Report: PHISHING',
+      excerpt: 'Fake bank login page reported for suspicious.com',
+      relevance: 'HIGH',
+      verificationStatus: 'SUPPORTED',
+      retrievedAt: new Date().toISOString()
+    }],
+    reports: [{ category: 'PHISHING', description: 'Fake bank login page reported for suspicious.com', status: 'VERIFIED' }]
+  };
+
+  const decision = calculateRisk('suspicious.com', mockReputation, mockWebRisk, mockCommunity);
+
+  assert.equal(decision.classification, THREAT_LEVELS.SUSPICIOUS);
+  assert.equal(decision.riskLevel, RISK_LEVELS.MEDIUM);
+
+  const commEv = decision.evidence.filter(e => e.source === 'COMMUNITY_REPORT');
+  assert.equal(commEv.length, 1);
+  assert.equal(commEv[0].title, 'Community Report: PHISHING');
+});
+
+test('R. TEST 4: Google Web Risk clean result remains separate from Community Report evidence', () => {
+  const mockReputation = { found: false, signals: [] };
+  const mockWebRisk = {
+    checked: true,
+    matchFound: false,
+    signals: [{
+      type: 'EXTERNAL_THREAT_INTEL_CLEAN',
+      source: 'GOOGLE_WEB_RISK',
+      severity: SIGNAL_SEVERITY.INFO,
+      weight: 0,
+      description: 'Google Web Risk returned no threat matches for this domain.'
+    }]
+  };
+  const mockCommunity = {
+    reportsCount: 1,
+    verifiedReportCount: 1,
+    signals: [{
+      type: 'VERIFIED_COMMUNITY_REPORTS',
+      source: 'USER_REPORT_DATABASE',
+      severity: SIGNAL_SEVERITY.HIGH,
+      weight: 70,
+      description: '1 community report verified by security analyst'
+    }],
+    evidence: [{
+      source: 'COMMUNITY_REPORT',
+      sourceType: 'USER_REPORT',
+      title: 'Community Report: PHISHING',
+      excerpt: 'Phishing domain impersonating banking portal',
+      relevance: 'HIGH',
+      verificationStatus: 'SUPPORTED'
+    }]
+  };
+
+  const decision = calculateRisk('suspicious.com', mockReputation, mockWebRisk, mockCommunity);
+
+  assert.equal(decision.classification, THREAT_LEVELS.SUSPICIOUS);
+
+  const webRiskEv = decision.evidence.filter(e => e.source === 'GOOGLE_WEB_RISK');
+  const commEv = decision.evidence.filter(e => e.source === 'COMMUNITY_REPORT');
+
+  assert.equal(webRiskEv.length, 0); // Clean Web Risk emits no threat evidence card
+  assert.equal(commEv.length, 1);
+  assert.equal(commEv[0].source, 'COMMUNITY_REPORT');
+});
+
+test('S. TEST 5: Final risk classification reflects intended VERIFIED community report rule', () => {
+  const mockCommunity = {
+    reportsCount: 1,
+    verifiedReportCount: 1,
+    actionedReportCount: 0,
+    signals: [{
+      type: 'VERIFIED_COMMUNITY_REPORTS',
+      source: 'USER_REPORT_DATABASE',
+      severity: SIGNAL_SEVERITY.HIGH,
+      weight: 70,
+      description: '1 community report verified by analyst'
+    }]
+  };
+
+  const decision = calculateRisk('suspicious.com', {}, {}, mockCommunity);
+
+  assert.equal(decision.classification, THREAT_LEVELS.SUSPICIOUS);
+  assert.equal(decision.riskLevel, RISK_LEVELS.MEDIUM);
+});
+
+test('T. TEST 6: Domain Normalization resolves consistently across variants', () => {
+  const { extractDomain } = require('../src/utilities/urlHelper');
+  const d1 = extractDomain('suspicious.com');
+  const d2 = extractDomain('www.suspicious.com');
+  const d3 = extractDomain('https://suspicious.com');
+  const d4 = extractDomain('https://www.suspicious.com/');
+
+  assert.equal(d1, 'suspicious.com');
+  assert.equal(d2, 'suspicious.com');
+  assert.equal(d3, 'suspicious.com');
+  assert.equal(d4, 'suspicious.com');
+});
+
+test('U. TEST 7: Unrelated domain does not receive suspicious.com report', () => {
+  const mockCommunityUnrelated = {
+    reportsCount: 0,
+    verifiedReportCount: 0,
+    actionedReportCount: 0,
+    signals: [],
+    reports: [],
+    evidence: []
+  };
+
+  const decision = calculateRisk('clean-unrelated-site.org', {}, {}, mockCommunityUnrelated);
+
+  assert.equal(decision.classification, THREAT_LEVELS.UNKNOWN);
+  assert.equal(decision.riskLevel, RISK_LEVELS.NONE);
+  assert.equal(decision.evidence.length, 0);
+});
+
+test('V. TEST 8: Non-actionable report status (REJECTED) contributes 0 weight', () => {
+  const mockCommunityRejected = {
+    reportsCount: 0,
+    verifiedReportCount: 0,
+    actionedReportCount: 0,
+    signals: [{
+      type: 'REJECTED_COMMUNITY_REPORTS',
+      source: 'USER_REPORT_DATABASE',
+      severity: SIGNAL_SEVERITY.INFO,
+      weight: 0,
+      description: '1 user report investigated and REJECTED'
+    }]
+  };
+
+  const decision = calculateRisk('rejected-site.com', {}, {}, mockCommunityRejected);
+
+  assert.equal(decision.classification, THREAT_LEVELS.UNKNOWN);
+  assert.equal(decision.riskLevel, RISK_LEVELS.NONE);
+});
+
