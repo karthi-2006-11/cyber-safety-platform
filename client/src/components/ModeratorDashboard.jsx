@@ -186,11 +186,38 @@ export default function ModeratorDashboard() {
                 </p>
 
                 {r.evidence && r.evidence.length > 0 && (
-                  <div style={{ background: 'rgba(0, 0, 0, 0.2)', padding: '8px 12px', borderRadius: '4px', marginBottom: '12px', fontSize: '12px' }}>
+                  <div style={{
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    padding: '8px 12px',
+                    borderRadius: '4px',
+                    marginBottom: '12px',
+                    fontSize: '12px',
+                    overflowWrap: 'anywhere',
+                    wordBreak: 'break-word',
+                    maxWidth: '100%'
+                  }}>
                     <div style={{ fontWeight: '600', color: 'var(--text-muted)', marginBottom: '4px' }}>Attached Evidence ({r.evidence.length}):</div>
                     {r.evidence.map(ev => (
-                      <div key={ev.id} style={{ color: 'var(--text-main)', margin: '2px 0' }}>
-                        &bull; [{ev.type}] {ev.title || 'Evidence'}: <em>{ev.content}</em> {ev.referenceUrl && `(${ev.referenceUrl})`}
+                      <div key={ev.id} style={{ color: 'var(--text-main)', margin: '4px 0', overflowWrap: 'anywhere', wordBreak: 'break-word', maxWidth: '100%' }}>
+                        &bull; [{ev.type}] {ev.title || 'Evidence'}: <em>{ev.content}</em> {ev.referenceUrl && (
+                          <a
+                            href={ev.referenceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              color: 'var(--primary-cyan, #00f2fe)',
+                              textDecoration: 'underline',
+                              wordBreak: 'break-all',
+                              overflowWrap: 'anywhere',
+                              marginLeft: '4px',
+                              maxWidth: '100%',
+                              display: 'inline-block'
+                            }}
+                            title={ev.referenceUrl}
+                          >
+                            ({ev.referenceUrl})
+                          </a>
+                        )}
                       </div>
                     ))}
                   </div>

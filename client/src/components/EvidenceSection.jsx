@@ -84,12 +84,12 @@ export default function EvidenceSection({ evidence = [] }) {
             {grouped.WIKIPEDIA.map((item, idx) => (
               <div key={idx} style={{ fontSize: '12px', marginBottom: '6px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-cyan)', fontWeight: '600', textDecoration: 'none' }}>
+                  <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-cyan)', fontWeight: '600', textDecoration: 'none', wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
                     {item.title} ↗
                   </a>
                   {getStatusBadge(item.verificationStatus)}
                 </div>
-                <p style={{ color: 'var(--text-muted)', marginTop: '2px' }}>{item.excerpt}</p>
+                <p style={{ color: 'var(--text-muted)', marginTop: '2px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{item.excerpt}</p>
               </div>
             ))}
           </div>
@@ -104,12 +104,12 @@ export default function EvidenceSection({ evidence = [] }) {
             {grouped.REDDIT.map((item, idx) => (
               <div key={idx} style={{ fontSize: '12px', marginBottom: '6px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ color: '#ff4500', fontWeight: '600', textDecoration: 'none' }}>
+                  <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ color: '#ff4500', fontWeight: '600', textDecoration: 'none', wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
                     {item.title} ↗
                   </a>
                   {getStatusBadge(item.verificationStatus)}
                 </div>
-                <p style={{ color: 'var(--text-muted)', marginTop: '2px' }}>{item.excerpt}</p>
+                <p style={{ color: 'var(--text-muted)', marginTop: '2px', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{item.excerpt}</p>
               </div>
             ))}
           </div>
