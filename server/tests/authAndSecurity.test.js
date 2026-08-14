@@ -281,3 +281,46 @@ test('20. Admin User Promoting User Role (Allowed)', () => {
 
   assert.equal(nextCalled, true);
 });
+
+test('21. Public Registration Blocking Reserved System Emails (mod@cybersafety.local and admin@cybersafety.local blocked with 409)', async () => {
+  let responseData = null;
+  let responseStatus = 0;
+  const res = {
+    status: (code) => { responseStatus = code; return res; },
+    json: (data) => { responseData = data; return res; }
+  };
+
+  const modReq = {
+    body: { email: 'mod@cybersafety.local', password: 'Password123!', name: 'Attacker' }
+  };
+  await register(modReq, res, () => {});
+
+  assert.equal(responseStatus, 409);
+  assert.equal(responseData.error, 'RESERVED_SYSTEM_ACCOUNT');
+
+  const adminReq = {
+    body: { email: 'admin@cybersafety.local', password: 'Password123!', name: 'Attacker' }
+  };
+  await register(adminReq, res, () => {});
+
+  assert.equal(responseStatus, 409);
+  assert.equal(responseData.error, 'RESERVED_SYSTEM_ACCOUNT');
+});
+
+test('22. Seeded Moderator & Admin Account JWT Role Verification', () => {
+  const modUser = { _id: '507f1f77bcf86cd799439099', email: 'mod@cybersafety.local', role: 'MODERATOR' };
+  const modToken = generateToken(modUser);
+  const modDecoded = verifyToken(modToken);
+
+  assert.equal(modDecoded.email, 'mod@cybersafety.local');
+  assert.equal(modDecoded.role, 'MODERATOR');
+
+  const adminUser = { _id: '507f1f77bcf86cd799439098', email: 'admin@cybersafety.local', role: 'ADMIN' };
+  const adminToken = generateToken(adminUser);
+  const adminDecoded = verifyToken(adminToken);
+
+  assert.equal(adminDecoded.email, 'admin@cybersafety.local');
+  assert.equal(adminDecoded.role, 'ADMIN');
+});
+
+

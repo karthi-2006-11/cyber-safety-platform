@@ -34,8 +34,18 @@ async function register(req, res, next) {
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = sanitizeText(name || '');
     
-    // CRITICAL SECURITY FIX: Unconditionally enforce role 'USER' for public registration.
-    // Never trust req.body.role, x-user-role, or any client input.
+    // CRITICAL SECURITY CONTRACT: Reserved system emails cannot be registered publicly
+    const RESERVED_SYSTEM_EMAILS = ['mod@cybersafety.local', 'admin@cybersafety.local'];
+    if (RESERVED_SYSTEM_EMAILS.includes(cleanEmail)) {
+      return res.status(409).json({
+        success: false,
+        error: 'RESERVED_SYSTEM_ACCOUNT',
+        message: 'This email address is reserved for system administration.'
+      });
+    }
+
+    // CRITICAL SECURITY CONTRACT: Public registration ALWAYS creates role 'USER'.
+    // Client-provided req.body.role, x-user-role, etc. are UNCONDITIONALLY IGNORED.
     const assignedRole = 'USER';
 
     const dbStatus = getDBStatus();

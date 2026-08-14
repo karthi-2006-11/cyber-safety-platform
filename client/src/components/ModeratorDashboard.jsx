@@ -70,19 +70,18 @@ export default function ModeratorDashboard() {
     }
   };
 
-  // Quick Account Switcher Helper for Testing JWT Auth Roles
-  const handleQuickLogin = async (targetRole) => {
+  const [modEmail, setModEmail] = useState('mod@cybersafety.local');
+  const [modPassword, setModPassword] = useState('');
+
+  const handleModeratorLogin = async (e) => {
+    e.preventDefault();
+    if (!modEmail.trim() || !modPassword) return;
+    setActionMessage(null);
     try {
-      const email = targetRole === 'MODERATOR' ? 'mod@cybersafety.local' : 'user@cybersafety.local';
-      const pass = 'Password123!';
-      try {
-        await login(email, pass);
-      } catch (e) {
-        // If account doesn't exist yet, register it as normal USER
-        await register(email, pass, `${targetRole} Account`);
-      }
+      await login(modEmail.trim(), modPassword);
+      setModPassword('');
     } catch (err) {
-      setActionMessage({ type: 'error', text: err.message });
+      setActionMessage({ type: 'error', text: `Authentication failed: ${err.message}` });
     }
   };
 
@@ -96,31 +95,38 @@ export default function ModeratorDashboard() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Auth Account:</span>
-            <span style={{ fontSize: '11px', fontWeight: '700', color: user?.role === 'MODERATOR' ? '#10b981' : '#ef4444' }}>
+            <span style={{ fontSize: '11px', fontWeight: '700', color: (user?.role === 'MODERATOR' || user?.role === 'ADMIN') ? '#10b981' : '#ef4444' }}>
               {user ? `${user.email} (${user.role})` : 'UNAUTHENTICATED'}
             </span>
           </div>
         </div>
 
-        <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '10px 14px', borderRadius: '6px', margin: '14px 0', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Test Account Quick Authentication Switcher:</span>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              className="btn btn-secondary"
-              style={{ fontSize: '11px', padding: '4px 10px' }}
-              onClick={() => handleQuickLogin('USER')}
-            >
-              Auth as Normal User
+        {(!user || (user.role !== 'MODERATOR' && user.role !== 'ADMIN')) && (
+          <form onSubmit={handleModeratorLogin} style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '14px', borderRadius: '6px', margin: '14px 0', border: '1px solid var(--border-color)', display: 'flex', flexWrap: 'wrap', gap: '10px', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', fontWeight: '600', width: '100%' }}>Moderator Authentication Required:</span>
+            <input
+              type="email"
+              className="input-field"
+              style={{ flex: 1, minWidth: '180px', padding: '6px 10px', fontSize: '12px' }}
+              placeholder="Moderator Email"
+              value={modEmail}
+              onChange={(e) => setModEmail(e.target.value)}
+              required
+            />
+            <input
+              type="password"
+              className="input-field"
+              style={{ flex: 1, minWidth: '160px', padding: '6px 10px', fontSize: '12px' }}
+              placeholder="Password"
+              value={modPassword}
+              onChange={(e) => setModPassword(e.target.value)}
+              required
+            />
+            <button type="submit" className="btn btn-primary" style={{ fontSize: '12px', padding: '6px 14px' }}>
+              Authenticate
             </button>
-            <button
-              className="btn btn-primary"
-              style={{ fontSize: '11px', padding: '4px 10px' }}
-              onClick={() => handleQuickLogin('MODERATOR')}
-            >
-              Auth as Moderator
-            </button>
-          </div>
-        </div>
+          </form>
+        )}
 
         <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
           Review pending community reports, inspect evidence, and action confirmed cyber threats for automatic browser blocking synchronization.
