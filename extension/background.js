@@ -1,131 +1,209 @@
 /**
  * Cyber Safety Platform - Extension Background Service Worker
- * Phase 5 Automatic Browser Protection & Blocking Engine
+ * Phase 12A: Real-Time URL Detection Engine (Detection Only)
+ * 
+ * Target Backend: https://cyber-safety-platform-50px.onrender.com/api/v1
+ * Threat Lookup Endpoint: GET /api/v1/threats/check?domain=<normalized-domain>
  */
 
-// Import dynamic configuration and DNR rule manager helper functions
-importScripts('config.js', 'ruleManager.js');
+// Import dynamic configuration
+importScripts('config.js');
 
-const API_BASE_URL = typeof CONFIG !== 'undefined' ? CONFIG.API_BASE_URL : 'http://localhost:5000/api/v1';
+const API_BASE_URL = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL)
+  ? CONFIG.API_BASE_URL
+  : 'https://cyber-safety-platform-50px.onrender.com/api/v1';
 
-// Synchronize rules on startup
-chrome.runtime.onInstalled.addListener(() => {
-  syncHighConfidenceThreats();
-});
+// Short-lived in-memory domain cache (5 minute TTL)
+const domainCache = new Map();
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
-chrome.runtime.onStartup.addListener(() => {
-  syncHighConfidenceThreats();
-});
+// Per-tab request version sequence map to prevent stale async race overwrites
+const tabRequestVersions = new Map();
 
-// Listen to webNavigation committed events
-if (chrome.webNavigation) {
-  chrome.webNavigation.onCommitted.addListener((details) => {
-    // Only inspect main frame navigation (frameId === 0)
-    if (details.frameId === 0 && details.url) {
-      inspectTabUrl(details.tabId, details.url);
-    }
-  });
-}
-
-// Fallback tab update listener
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url) {
-    inspectTabUrl(tabId, tab.url);
-  }
-});
-
-/**
- * Synchronizes high-confidence threat rules from backend database.
- */
-async function syncHighConfidenceThreats() {
+// Listen for tab switching
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  if (!activeInfo || !activeInfo.tabId) return;
   try {
-    const res = await fetch(`${API_BASE_URL}/threats/high-confidence`);
-    if (res.ok) {
-      const json = await res.json();
-      if (json.success && Array.isArray(json.domains)) {
-        await syncBlockRules(json.domains);
-        console.log(`[CyberSafety Extension] Synchronized ${json.domains.length} high-confidence threat rules.`);
-      }
+    const tab = await chrome.tabs.get(activeInfo.tabId).catch(() => null);
+    if (tab && tab.url) {
+      inspectTabUrl(activeInfo.tabId, tab.url);
     }
   } catch (err) {
-    console.warn('[CyberSafety Extension] Could not pre-sync high confidence threats:', err.message);
+    // Safely ignore tab lifecycle lookup errors
+  }
+});
+
+// Listen for tab URL updates & page reload
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo && changeInfo.status === 'complete' && tab && tab.url) {
+    inspectTabUrl(tabId, tab.url).catch(() => {});
+  }
+});
+
+/**
+ * Clean up sequence maps when tabs are closed
+ */
+chrome.tabs.onRemoved.addListener((tabId) => {
+  tabRequestVersions.delete(tabId);
+});
+
+/**
+ * Extracts and normalizes domain from URL string.
+ * Strips scheme, paths, query params, fragments, and leading 'www.'.
+ * Bypasses internal browser protocols (chrome://, about:, file://, etc.).
+ */
+function extractCanonicalDomain(urlString) {
+  if (!urlString || typeof urlString !== 'string') return null;
+
+  const trimmed = urlString.trim().toLowerCase();
+  if (
+    trimmed.startsWith('chrome://') ||
+    trimmed.startsWith('chrome-extension://') ||
+    trimmed.startsWith('edge://') ||
+    trimmed.startsWith('about:') ||
+    trimmed.startsWith('file://')
+  ) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+
+    let hostname = parsed.hostname;
+    if (hostname.startsWith('www.')) {
+      hostname = hostname.slice(4);
+    }
+
+    return hostname || null;
+  } catch (err) {
+    return null;
   }
 }
 
 /**
- * Inspects domain and handles classification:
- * HIGH_CONFIDENCE_THREAT -> Installs DNR rule & redirects tab to extension blocked.html
- * SUSPICIOUS -> Sends warning overlay message to content.js
- * SAFE / UNKNOWN -> Allows normal browsing
+ * Real-time domain threat inspection with tab sequence versioning and lifecycle protection.
  */
 async function inspectTabUrl(tabId, urlString) {
-  if (!urlString || urlString.startsWith('chrome://') || urlString.startsWith('chrome-extension://')) {
-    updateBadge(tabId, '', '#6c757d');
+  if (!tabId) return;
+
+  // Increment version sequence for this tab to guard against stale async races
+  const currentVersion = (tabRequestVersions.get(tabId) || 0) + 1;
+  tabRequestVersions.set(tabId, currentVersion);
+
+  const domain = extractCanonicalDomain(urlString);
+
+  if (!domain) {
+    await updateBadge(tabId, 'N/A', '#6b7280');
+    if (tabRequestVersions.get(tabId) === currentVersion) {
+      await chrome.storage.local.set({
+        activeDomain: urlString ? 'Internal Browser Page' : 'No Active Domain',
+        activeStatus: 'UNSUPPORTED',
+        activeData: null,
+        lastCheckedAt: new Date().toISOString()
+      }).catch(() => {});
+    }
     return;
   }
 
-  let domain = '';
-  try {
-    const parsed = new URL(urlString);
-    domain = parsed.hostname;
-    if (domain.startsWith('www.')) domain = domain.slice(4);
-  } catch (e) {
+  // Check in-memory short-lived cache
+  const cached = domainCache.get(domain);
+  if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+    if (tabRequestVersions.get(tabId) === currentVersion) {
+      await applyInspectionResult(tabId, domain, cached.result);
+    }
     return;
   }
-
-  // Save active domain in storage
-  await chrome.storage.local.set({ currentDomain: domain, currentUrl: urlString, lastCheckedAt: new Date().toISOString() });
 
   try {
     const response = await fetch(`${API_BASE_URL}/threats/check?domain=${encodeURIComponent(domain)}`);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`HTTP_${response.status}`);
 
     const json = await response.json();
     const decision = json.data || {};
-    const status = decision.status || decision.classification || 'UNKNOWN';
 
-    await chrome.storage.local.set({ activeStatus: status, threatData: decision });
+    // Cache normalized result
+    domainCache.set(domain, { timestamp: Date.now(), result: decision });
 
-    if (status === 'HIGH_CONFIDENCE_THREAT') {
-      // 1. Add permanent dynamic DNR rule for domain
-      await addBlockRule(domain, decision);
-
-      // 2. Redirect active tab immediately to extension blocked page
-      const blockPageUrl = chrome.runtime.getURL(`blocked.html?domain=${encodeURIComponent(domain)}`);
-      if (!urlString.includes('blocked.html')) {
-        chrome.tabs.update(tabId, { url: blockPageUrl });
-      }
-
-      updateBadge(tabId, 'BLOCK', '#dc3545');
-
-    } else if (status === 'SUSPICIOUS') {
-      // Send warning message to content script overlay
-      chrome.tabs.sendMessage(tabId, {
-        action: 'WARN_USER',
-        reason: decision.reasons ? decision.reasons.join('; ') : 'Potential cyber threat detected.',
-        decision
-      }).catch(() => {});
-
-      updateBadge(tabId, 'WARN', '#ffc107');
-
-    } else if (status === 'SAFE') {
-      updateBadge(tabId, 'SAFE', '#28a745');
-    } else {
-      updateBadge(tabId, '?', '#6c757d');
+    // Verify tab is still on the same request version before applying result
+    if (tabRequestVersions.get(tabId) === currentVersion) {
+      await applyInspectionResult(tabId, domain, decision);
     }
 
   } catch (err) {
-    console.warn('[CyberSafety Extension] Backend unreachable during inspection:', err.message);
-    await chrome.storage.local.set({ activeStatus: 'UNREACHABLE', error: err.message });
-    updateBadge(tabId, 'OFF', '#6c757d');
+    console.warn(`[CyberSafety Extension] Backend lookup error for ${domain}:`, err.message);
+    const errorDecision = {
+      domain,
+      classification: 'OFFLINE',
+      riskLevel: 'UNKNOWN',
+      confidence: 0,
+      reasons: ['Cyber Safety backend is currently unreachable.']
+    };
+    if (tabRequestVersions.get(tabId) === currentVersion) {
+      await applyInspectionResult(tabId, domain, errorDecision);
+    }
   }
 }
 
-function updateBadge(tabId, text, color) {
-  if (chrome.action) {
-    chrome.action.setBadgeText({ tabId, text });
-    chrome.action.setBadgeBackgroundColor({ tabId, color });
+/**
+ * Updates extension action badge and persists tab inspection state in chrome.storage.local.
+ * Safely guards against closed or replaced tabs.
+ */
+async function applyInspectionResult(tabId, domain, decision) {
+  if (!tabId) return;
+
+  // Confirm tab still exists before setting storage or updating badge
+  const tabExists = await chrome.tabs.get(tabId).then(() => true).catch(() => false);
+  if (!tabExists) return;
+
+  const status = decision.classification || decision.status || 'UNKNOWN';
+
+  await chrome.storage.local.set({
+    activeDomain: domain,
+    activeStatus: status,
+    activeData: decision,
+    lastCheckedAt: new Date().toISOString()
+  }).catch(() => {});
+
+  switch (status) {
+    case 'SAFE':
+      await updateBadge(tabId, 'SAFE', '#10b981');
+      break;
+    case 'SUSPICIOUS':
+      await updateBadge(tabId, 'WARN', '#f59e0b');
+      break;
+    case 'HIGH_CONFIDENCE_THREAT':
+      await updateBadge(tabId, 'RISK', '#ef4444');
+      break;
+    case 'OFFLINE':
+      await updateBadge(tabId, 'OFF', '#6b7280');
+      break;
+    case 'UNKNOWN':
+    default:
+      await updateBadge(tabId, 'OK', '#64748b');
+      break;
   }
 }
 
-console.log('[CyberSafety Extension] Phase 5 Protection & Blocking Engine Initialized.');
+/**
+ * Safe action badge updater that explicitly handles Chrome tab closure/lifecycle errors.
+ */
+async function updateBadge(tabId, text, color) {
+  if (!chrome.action || !tabId) return;
+  try {
+    // Verify tab still exists before calling badge APIs
+    const tabExists = await chrome.tabs.get(tabId).then(() => true).catch(() => false);
+    if (!tabExists) return;
+
+    await chrome.action.setBadgeText({ tabId, text });
+    await chrome.action.setBadgeBackgroundColor({ tabId, color });
+  } catch (err) {
+    // Ignore expected tab lifecycle errors if tab disappeared mid-execution
+    if (err.message && err.message.includes('No tab with id')) {
+      return;
+    }
+    console.warn('[CyberSafety Extension] Badge update error:', err.message);
+  }
+}
+
+console.log('[CyberSafety Extension] Phase 12A Real-Time URL Detection Service Worker Loaded.');

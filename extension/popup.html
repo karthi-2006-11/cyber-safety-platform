@@ -3,42 +3,70 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cyber Safety Protection</title>
+  <title>Cyber Safety Protection Engine</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="popup-container">
+    <!-- Header -->
     <header class="header">
       <div class="brand">
         <span class="shield-icon">🛡️</span>
-        <h1>Cyber Safety</h1>
+        <div>
+          <h1>Cyber Safety</h1>
+          <span class="version-label">v1.1 Real-Time Engine</span>
+        </div>
       </div>
       <div class="status-indicator">
         <span id="backend-status-dot" class="status-dot offline"></span>
-        <span id="protection-status-label" style="font-size: 11px; color: var(--text-muted);">Checking...</span>
+        <span id="protection-status-label" class="status-text">Connecting...</span>
       </div>
     </header>
 
-    <div class="domain-card">
-      <div class="domain-label">Current Website</div>
+    <!-- Domain Card -->
+    <div class="card domain-card">
+      <div class="card-label">Inspected Domain</div>
       <div id="domain-name" class="domain-value">Loading...</div>
     </div>
 
-    <div class="status-card">
-      <div class="status-header">Safety Classification</div>
+    <!-- Main Classification Card -->
+    <div class="card status-card">
+      <div class="card-label">Threat Classification</div>
       <div id="status-badge" class="badge unknown">UNKNOWN</div>
-      <p id="status-description" class="status-desc">
-        Inspecting domain against threat pipeline...
-      </p>
+      
+      <div class="metrics-row">
+        <div class="metric-col">
+          <span class="metric-label">Risk Level</span>
+          <span id="risk-level-value" class="metric-val">NONE</span>
+        </div>
+        <div class="metric-col">
+          <span class="metric-label">Confidence</span>
+          <span id="confidence-value" class="metric-val">50%</span>
+        </div>
+      </div>
+
+      <div class="reasons-box">
+        <div class="reasons-label">Primary Analysis Reasons</div>
+        <ul id="reasons-list" class="reasons-list">
+          <li>Inspecting website against threat intelligence pipeline...</li>
+        </ul>
+      </div>
     </div>
 
-    <div class="rules-summary-box">
-      <span style="font-size: 14px;">🔒</span>
-      <span id="blocked-rules-count">0 Active Block Rules</span>
+    <!-- Evidence Sources Breakdown -->
+    <div class="card evidence-card">
+      <div class="evidence-header">
+        <span class="evidence-title">Supporting Evidence</span>
+        <span id="evidence-count-badge" class="evidence-count-tag">0 Sources</span>
+      </div>
+      <div id="evidence-list-container" class="evidence-list">
+        <div class="empty-evidence">No external threat evidence linked.</div>
+      </div>
     </div>
 
+    <!-- Footer CTA -->
     <footer class="footer">
-      <button id="open-dashboard-btn" class="btn-primary">Open User Dashboard</button>
+      <button id="open-dashboard-btn" class="btn-primary">Open Security Portal</button>
     </footer>
   </div>
 

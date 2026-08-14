@@ -1,43 +1,40 @@
 /**
  * Cyber Safety Platform - Extension Production Configuration
- * Configurable source of truth for Extension API host & endpoints.
+ * Source of truth for Extension API host & endpoints.
  * 
- * IMPORTANT:
- * Production URLs below are PLACEHOLDERS.
- * Replace 'https://YOUR-PRODUCTION-API.example.com' with the actual deployed HTTPS API URL before production packaging.
+ * Target Production Backend: https://cyber-safety-platform-50px.onrender.com
+ * Target Production Client:  https://cyber-safety-platform-client.onrender.com
  */
 
 const CONFIG = {
   // Toggle environment: 'development' or 'production'
-  ENVIRONMENT: 'development',
+  ENVIRONMENT: 'production',
 
   // API host targets
   API_HOSTS: {
     development: 'http://localhost:5000',
-    // PLACEHOLDER — replace with the actual deployed HTTPS API URL before production packaging
-    production: 'https://YOUR-PRODUCTION-API.example.com'
+    production: 'https://cyber-safety-platform-50px.onrender.com'
   },
 
   // Dashboard host targets
   DASHBOARD_HOSTS: {
     development: 'http://localhost:3000',
-    // PLACEHOLDER — replace with the actual deployed dashboard URL before production packaging
-    production: 'https://YOUR-PRODUCTION-DASHBOARD.example.com'
+    production: 'https://cyber-safety-platform-client.onrender.com'
   },
 
   // Active API base URL getter
   get API_BASE_URL() {
-    const host = this.API_HOSTS[this.ENVIRONMENT] || this.API_HOSTS.development;
+    const host = this.API_HOSTS[this.ENVIRONMENT] || this.API_HOSTS.production;
     return `${host}/api/v1`;
   },
 
   // Active Dashboard URL getter
   get DASHBOARD_URL() {
-    return this.DASHBOARD_HOSTS[this.ENVIRONMENT] || this.DASHBOARD_HOSTS.development;
+    return this.DASHBOARD_HOSTS[this.ENVIRONMENT] || this.DASHBOARD_HOSTS.production;
   }
 };
 
-// Export for service worker importScripts or module scripts
+// Export for service worker importScripts or module environments
 if (typeof self !== 'undefined') {
   self.CONFIG = CONFIG;
 }

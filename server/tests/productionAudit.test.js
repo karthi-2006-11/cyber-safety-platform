@@ -14,8 +14,8 @@ test('1. Extension Production Config — Dynamic API URL Resolution', () => {
   // Test switching environment dynamically
   const originalEnv = extensionConfig.ENVIRONMENT;
   extensionConfig.ENVIRONMENT = 'production';
-  assert.equal(extensionConfig.API_BASE_URL, 'https://YOUR-PRODUCTION-API.example.com/api/v1');
-  assert.equal(extensionConfig.DASHBOARD_URL, 'https://YOUR-PRODUCTION-DASHBOARD.example.com');
+  assert.equal(extensionConfig.API_BASE_URL, 'https://cyber-safety-platform-50px.onrender.com/api/v1');
+  assert.equal(extensionConfig.DASHBOARD_URL, 'https://cyber-safety-platform-client.onrender.com');
   extensionConfig.ENVIRONMENT = originalEnv;
 });
 
