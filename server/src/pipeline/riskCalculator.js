@@ -111,9 +111,15 @@ function calculateRisk(
       riskLevel = RISK_LEVELS.MEDIUM;
       confidence = 0.75;
     } else if (dbStatus === THREAT_LEVELS.SAFE) {
-      classification = THREAT_LEVELS.SAFE;
-      riskLevel = RISK_LEVELS.NONE;
-      confidence = 0.85;
+      if (hasCriticalSecurityIntelMatch) {
+        classification = THREAT_LEVELS.HIGH_CONFIDENCE_THREAT;
+        riskLevel = RISK_LEVELS.HIGH;
+        confidence = 0.90;
+      } else {
+        classification = THREAT_LEVELS.SAFE;
+        riskLevel = RISK_LEVELS.NONE;
+        confidence = 0.85;
+      }
     }
   } else {
     // 2. Evaluate Promotion Criteria for HIGH_CONFIDENCE_THREAT

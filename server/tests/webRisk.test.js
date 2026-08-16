@@ -282,3 +282,79 @@ test('12. External Service Failure Does Not Crash Threat Pipeline', async () => 
   assert.equal(decision.classification, THREAT_LEVELS.UNKNOWN);
   assert.ok(decision.reasons.some(r => r.includes('Google Web Risk lookup unavailable')));
 });
+
+test('13. Live Critical Web Risk Match Overrides Stale Local SAFE DB Record', () => {
+  const mockSafeReputation = {
+    found: true,
+    websiteRecord: { currentStatus: THREAT_LEVELS.SAFE },
+    signals: [{
+      type: 'LOCAL_RECORD',
+      source: 'DATABASE_WEBSITE_RECORD',
+      severity: SIGNAL_SEVERITY.INFO,
+      weight: 0,
+      description: 'Official database record specifies status: SAFE',
+      reliability: 0.95
+    }]
+  };
+
+  const mockMalwareWebRisk = {
+    checked: true,
+    matchFound: true,
+    threatTypes: ['MALWARE'],
+    signals: [{
+      type: 'EXTERNAL_THREAT_INTEL_MATCH',
+      source: 'GOOGLE_WEB_RISK',
+      severity: SIGNAL_SEVERITY.CRITICAL,
+      weight: 90,
+      threatType: 'MALWARE',
+      description: 'Google Web Risk identified this URL as MALWARE',
+      reliability: 0.95
+    }]
+  };
+
+  const mockCleanWebRisk = {
+    checked: true,
+    matchFound: false,
+    signals: [{
+      type: 'EXTERNAL_THREAT_INTEL_CLEAN',
+      source: 'GOOGLE_WEB_RISK',
+      severity: SIGNAL_SEVERITY.INFO,
+      weight: 0,
+      description: 'Google Web Risk returned no threat matches for this domain.',
+      reliability: 0.85
+    }]
+  };
+
+  const mockUnavailableWebRisk = {
+    checked: false,
+    signals: [{
+      type: 'EXTERNAL_THREAT_INTEL_UNAVAILABLE',
+      source: 'GOOGLE_WEB_RISK',
+      severity: SIGNAL_SEVERITY.INFO,
+      weight: 0,
+      description: 'Google Web Risk lookup unavailable; skipping external check.',
+      reliability: 0.50
+    }]
+  };
+
+  const mockCommunity = { signals: [], reports: [] };
+
+  // Case A: Local SAFE + Live Web Risk MALWARE -> Overrides to HIGH_CONFIDENCE_THREAT
+  const decisionMalware = calculateRisk('stale-safe-domain.com', mockSafeReputation, mockMalwareWebRisk, mockCommunity);
+  assert.equal(decisionMalware.classification, THREAT_LEVELS.HIGH_CONFIDENCE_THREAT);
+  assert.equal(decisionMalware.riskLevel, RISK_LEVELS.HIGH);
+  assert.equal(decisionMalware.confidence, 0.90);
+  assert.ok(decisionMalware.reasons.some(r => r.includes('Google Web Risk identified this URL as MALWARE')));
+
+  // Case B: Local SAFE + Web Risk CLEAN -> Retains SAFE
+  const decisionClean = calculateRisk('safe-clean-domain.com', mockSafeReputation, mockCleanWebRisk, mockCommunity);
+  assert.equal(decisionClean.classification, THREAT_LEVELS.SAFE);
+  assert.equal(decisionClean.riskLevel, RISK_LEVELS.NONE);
+  assert.equal(decisionClean.confidence, 0.85);
+
+  // Case C: Local SAFE + Web Risk UNAVAILABLE -> Retains SAFE
+  const decisionUnavailable = calculateRisk('safe-unavail-domain.com', mockSafeReputation, mockUnavailableWebRisk, mockCommunity);
+  assert.equal(decisionUnavailable.classification, THREAT_LEVELS.SAFE);
+  assert.equal(decisionUnavailable.riskLevel, RISK_LEVELS.NONE);
+  assert.equal(decisionUnavailable.confidence, 0.85);
+});
