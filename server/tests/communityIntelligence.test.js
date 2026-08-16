@@ -417,3 +417,180 @@ test('V. TEST 8: Non-actionable report status (REJECTED) contributes 0 weight', 
   assert.equal(decision.riskLevel, RISK_LEVELS.NONE);
 });
 
+test('W. Moderation Rejection — Single ACTIONED report rejected updates Website status to UNKNOWN', async () => {
+  const UserReport = require('../src/models/UserReport');
+  const Website = require('../src/models/Website');
+  const Evidence = require('../src/models/Evidence');
+  const { rejectReport } = require('../src/controllers/moderation.controller');
+
+  const mockReport = {
+    _id: 'report123',
+    domain: 'single-actioned-domain.com',
+    status: REPORT_STATUS.ACTIONED,
+    confidenceContribution: 0.90,
+    moderationMetadata: {},
+    save: async function() { this.saved = true; }
+  };
+  const mockWebsite = {
+    domain: 'single-actioned-domain.com',
+    currentStatus: THREAT_LEVELS.HIGH_CONFIDENCE_THREAT,
+    save: async function() { this.saved = true; }
+  };
+
+  const origFindById = UserReport.findById;
+  const origCountDocs = UserReport.countDocuments;
+  const origFindOne = Website.findOne;
+  const origUpdateMany = Evidence.updateMany;
+
+  UserReport.findById = async () => mockReport;
+  UserReport.countDocuments = async () => 0;
+  Website.findOne = async () => mockWebsite;
+  Evidence.updateMany = async () => true;
+
+  const req = { params: { id: 'report123' }, body: { notes: 'Reverting action' }, user: { email: 'mod@local' } };
+  const res = { status: () => res, json: () => res };
+
+  await rejectReport(req, res, () => {});
+
+  UserReport.findById = origFindById;
+  UserReport.countDocuments = origCountDocs;
+  Website.findOne = origFindOne;
+  Evidence.updateMany = origUpdateMany;
+
+  assert.equal(mockReport.status, REPORT_STATUS.REJECTED);
+  assert.equal(mockWebsite.currentStatus, THREAT_LEVELS.UNKNOWN);
+});
+
+test('X. Moderation Rejection — Two ACTIONED reports preserves HIGH_CONFIDENCE_THREAT when one is rejected', async () => {
+  const UserReport = require('../src/models/UserReport');
+  const Website = require('../src/models/Website');
+  const Evidence = require('../src/models/Evidence');
+  const { rejectReport } = require('../src/controllers/moderation.controller');
+
+  const mockReport = {
+    _id: 'reportA',
+    domain: 'multi-actioned-domain.com',
+    status: REPORT_STATUS.ACTIONED,
+    save: async function() {}
+  };
+  const mockWebsite = {
+    domain: 'multi-actioned-domain.com',
+    currentStatus: THREAT_LEVELS.HIGH_CONFIDENCE_THREAT,
+    save: async function() {}
+  };
+
+  const origFindById = UserReport.findById;
+  const origCountDocs = UserReport.countDocuments;
+  const origFindOne = Website.findOne;
+  const origUpdateMany = Evidence.updateMany;
+
+  UserReport.findById = async () => mockReport;
+  UserReport.countDocuments = async (query) => {
+    if (query && query.status === REPORT_STATUS.ACTIONED) return 1;
+    return 0;
+  };
+  Website.findOne = async () => mockWebsite;
+  Evidence.updateMany = async () => true;
+
+  const req = { params: { id: 'reportA' }, body: {}, user: { email: 'mod@local' } };
+  const res = { status: () => res, json: () => res };
+
+  await rejectReport(req, res, () => {});
+
+  UserReport.findById = origFindById;
+  UserReport.countDocuments = origCountDocs;
+  Website.findOne = origFindOne;
+  Evidence.updateMany = origUpdateMany;
+
+  assert.equal(mockReport.status, REPORT_STATUS.REJECTED);
+  assert.equal(mockWebsite.currentStatus, THREAT_LEVELS.HIGH_CONFIDENCE_THREAT);
+});
+
+test('Y. Moderation Rejection — Rejecting report that was never ACTIONED preserves SAFE reputation', async () => {
+  const UserReport = require('../src/models/UserReport');
+  const Website = require('../src/models/Website');
+  const Evidence = require('../src/models/Evidence');
+  const { rejectReport } = require('../src/controllers/moderation.controller');
+
+  const mockReport = {
+    _id: 'reportPending',
+    domain: 'safe-reputation-domain.com',
+    status: REPORT_STATUS.PENDING,
+    save: async function() {}
+  };
+  const mockWebsite = {
+    domain: 'safe-reputation-domain.com',
+    currentStatus: THREAT_LEVELS.SAFE,
+    save: async function() {}
+  };
+
+  const origFindById = UserReport.findById;
+  const origCountDocs = UserReport.countDocuments;
+  const origFindOne = Website.findOne;
+  const origUpdateMany = Evidence.updateMany;
+
+  UserReport.findById = async () => mockReport;
+  UserReport.countDocuments = async () => 0;
+  Website.findOne = async () => mockWebsite;
+  Evidence.updateMany = async () => true;
+
+  const req = { params: { id: 'reportPending' }, body: {}, user: { email: 'mod@local' } };
+  const res = { status: () => res, json: () => res };
+
+  await rejectReport(req, res, () => {});
+
+  UserReport.findById = origFindById;
+  UserReport.countDocuments = origCountDocs;
+  Website.findOne = origFindOne;
+  Evidence.updateMany = origUpdateMany;
+
+  assert.equal(mockReport.status, REPORT_STATUS.REJECTED);
+  assert.equal(mockWebsite.currentStatus, THREAT_LEVELS.SAFE);
+});
+
+test('Z. Moderation Rejection — Recalculates to SUSPICIOUS when remaining VERIFIED report exists', async () => {
+  const UserReport = require('../src/models/UserReport');
+  const Website = require('../src/models/Website');
+  const Evidence = require('../src/models/Evidence');
+  const { rejectReport } = require('../src/controllers/moderation.controller');
+
+  const mockReport = {
+    _id: 'reportActioned',
+    domain: 'verified-remaining-domain.com',
+    status: REPORT_STATUS.ACTIONED,
+    save: async function() {}
+  };
+  const mockWebsite = {
+    domain: 'verified-remaining-domain.com',
+    currentStatus: THREAT_LEVELS.HIGH_CONFIDENCE_THREAT,
+    save: async function() {}
+  };
+
+  const origFindById = UserReport.findById;
+  const origCountDocs = UserReport.countDocuments;
+  const origFindOne = Website.findOne;
+  const origUpdateMany = Evidence.updateMany;
+
+  UserReport.findById = async () => mockReport;
+  UserReport.countDocuments = async (query) => {
+    if (query && query.status === REPORT_STATUS.ACTIONED) return 0;
+    if (query && query.status === REPORT_STATUS.VERIFIED) return 1;
+    return 0;
+  };
+  Website.findOne = async () => mockWebsite;
+  Evidence.updateMany = async () => true;
+
+  const req = { params: { id: 'reportActioned' }, body: {}, user: { email: 'mod@local' } };
+  const res = { status: () => res, json: () => res };
+
+  await rejectReport(req, res, () => {});
+
+  UserReport.findById = origFindById;
+  UserReport.countDocuments = origCountDocs;
+  Website.findOne = origFindOne;
+  Evidence.updateMany = origUpdateMany;
+
+  assert.equal(mockReport.status, REPORT_STATUS.REJECTED);
+  assert.equal(mockWebsite.currentStatus, THREAT_LEVELS.SUSPICIOUS);
+});
+

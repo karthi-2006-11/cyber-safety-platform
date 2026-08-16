@@ -206,6 +206,34 @@ async function rejectReport(req, res, next) {
       { verificationStatus: VERIFICATION_STATUS.UNVERIFIED, isVerified: false }
     );
 
+    // Maintain Website reputation consistency after report status rejection
+    const website = await Website.findOne({ domain: report.domain });
+    if (website) {
+      const remainingActioned = await UserReport.countDocuments({
+        domain: report.domain,
+        status: REPORT_STATUS.ACTIONED
+      });
+
+      if (remainingActioned > 0) {
+        website.currentStatus = THREAT_LEVELS.HIGH_CONFIDENCE_THREAT;
+        website.lastAnalyzedAt = new Date();
+        await website.save();
+      } else if (website.currentStatus === THREAT_LEVELS.HIGH_CONFIDENCE_THREAT || website.currentStatus === THREAT_LEVELS.SUSPICIOUS) {
+        const remainingVerified = await UserReport.countDocuments({
+          domain: report.domain,
+          status: REPORT_STATUS.VERIFIED
+        });
+
+        if (remainingVerified > 0) {
+          website.currentStatus = THREAT_LEVELS.SUSPICIOUS;
+        } else {
+          website.currentStatus = THREAT_LEVELS.UNKNOWN;
+        }
+        website.lastAnalyzedAt = new Date();
+        await website.save();
+      }
+    }
+
     logger.security(`Report #${id} REJECTED by moderator ${req.user.email}`, {
       reportId: id,
       domain: report.domain,
